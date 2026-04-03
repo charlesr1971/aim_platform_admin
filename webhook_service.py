@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, Header, HTTPException
 import stripe
 import os
-import psycopg2
+from db_utils import get_db_connection
 from stripe_handler import handle_webhook_payload
 from dotenv import load_dotenv
 

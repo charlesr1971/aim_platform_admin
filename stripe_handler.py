@@ -1,9 +1,9 @@
 import stripe
 import os
-import psycopg2
+from db_utils import get_db_connection
 from dotenv import load_dotenv
 
-# Load environment variables (Local .env or Cloud Config Vars)
+# Load environment variables (Local .env or Windows System Vars)
 load_dotenv()
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
@@ -27,7 +27,7 @@ def create_checkout_session(email, user_id):
             # Redirects back to your Streamlit app
             success_url=os.getenv("BASE_URL") + "/?payment=success",
             cancel_url=os.getenv("BASE_URL") + "/?payment=cancelled",
-            # Crucial: This metadata is sent back in the Webhook to identify the user
+            # Metadata is sent back in the Webhook to identify the user
             metadata={
                 'user_id': user_id,
                 'email': email
@@ -40,8 +40,7 @@ def create_checkout_session(email, user_id):
 def handle_webhook_payload(payload, sig_header):
     """
     The Webhook Listener logic. 
-    This should be called by a separate Flask/FastAPI endpoint or a 
-    serverless function (AWS Lambda/Google Cloud Function).
+    Called by webhook_service.py (FastAPI) to update MySQL.
     """
     event = None
     endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
@@ -56,22 +55,27 @@ def handle_webhook_payload(payload, sig_header):
     # Handle the event where a subscription is successfully created/paid
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
+        # Retrieve user_id from metadata
         user_id = session['metadata']['user_id']
         
-        # PRO PRODUCTION LOGIC: Update PostgreSQL
+        # MYSQL PRODUCTION LOGIC: Update local database
         try:
-            conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+            conn = get_db_connection()
             cur = conn.cursor()
+            
+            # Update the user to 'pro' tier
             cur.execute(
                 "UPDATE users SET subscription_tier = 'pro' WHERE user_id = %s", 
                 (user_id,)
             )
+            
             conn.commit()
             cur.close()
             conn.close()
             return True
         except Exception as db_error:
-            print(f"Database update failed: {db_error}")
+            # Log error for Windows Event Viewer / Terminal
+            print(f"MySQL update failed for user {user_id}: {db_error}")
             return False
 
     return False
