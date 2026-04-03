@@ -10,7 +10,7 @@ load_dotenv(dotenv_path=env_path)
 
 def run_backup():
     # 2. Setup Paths
-    backup_dir = Path(r"C:\inetpub\backups\aim_platform")
+    backup_dir = Path(r"C:\inetpub\backups\aim_platform_admin")
     backup_dir.mkdir(parents=True, exist_ok=True)
     
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
@@ -24,7 +24,7 @@ def run_backup():
     
     # 4. Path to mysqldump (standard for MySQL 5.5 on Windows)
     # Check your install path; it might be C:\Program Files\MySQL\MySQL Server 5.5\bin\mysqldump.exe
-    dump_exe = r"mysqldump.exe" 
+    dump_exe = r"C:\Program Files\MySQL\MySQL Server 5.5\bin\mysqldump.exe" 
 
     print(f"--- 💾 Starting DB Backup: {db_name} ---")
     
