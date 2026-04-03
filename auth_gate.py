@@ -5,6 +5,25 @@ from db_utils import get_db_connection
 from datetime import datetime
 
 def render_login():
+    # --- NEW: POST-REGISTRATION WELCOME STATE ---
+    if st.session_state.get('reg_success'):
+        st.balloons()
+        st.success(f"🚀 Account Created Successfully for {st.session_state.reg_email}!")
+        st.markdown(f"""
+            ### Welcome to the Terminal
+            Your account for **{st.session_state.reg_email}** is now active on the **Free Tier**. 
+            
+            **What's next?**
+            1. Click the button below to return to the login screen.
+            2. Enter your credentials in the **🔑 Login** tab.
+            3. Explore the terminal or upgrade to **Pro** for Claude-powered sentiment.
+        """)
+        if st.button("Got it, take me to Login"):
+            del st.session_state.reg_success
+            del st.session_state.reg_email
+            st.rerun()
+        return # Stop execution here to hide the forms
+
     st.title("📟 AIM INSIGHTS TERMINAL")
     
     # Toggle between Login and Registration
@@ -22,7 +41,6 @@ def render_login():
 
     # --- TAB 2: REGISTRATION ---
     with tab2:
-        # Initialize math challenge in session state for bot protection
         if 'captcha_a' not in st.session_state:
             st.session_state.captcha_a = random.randint(1, 10)
             st.session_state.captcha_b = random.randint(1, 10)
@@ -34,7 +52,6 @@ def render_login():
             new_pw = st.text_input("Choose Password", type="password")
             conf_pw = st.text_input("Confirm Password", type="password")
             
-            # The Bot Check
             captcha_ans = st.number_input(
                 f"Bot Check: What is {st.session_state.captcha_a} + {st.session_state.captcha_b}?", 
                 step=1, value=0
@@ -50,11 +67,15 @@ def render_login():
                 elif len(new_pw) < 8:
                     st.error("❌ Password must be at least 8 characters.")
                 else:
-                    process_registration(new_email, new_pw)
-                    # Reset captcha values for security
-                    del st.session_state.captcha_a
-                    del st.session_state.captcha_b
-                    st.rerun()
+                    # Capture result of registration
+                    if process_registration(new_email, new_pw):
+                        # Set success state to trigger the Welcome Screen
+                        st.session_state.reg_success = True
+                        st.session_state.reg_email = new_email
+                        # Clean up captcha
+                        if 'captcha_a' in st.session_state: del st.session_state.captcha_a
+                        if 'captcha_b' in st.session_state: del st.session_state.captcha_b
+                        st.rerun()
 
 def process_login(email, password):
     try:
@@ -68,13 +89,12 @@ def process_login(email, password):
         """, (email,))
         user = cur.fetchone()
         
+        # Index-based mapping for MySQL 5.5 (0=id, 1=email, 2=tier, 3=admin, 4=hash)
         if user and bcrypt.checkpw(password.encode('utf-8'), user[4].encode('utf-8')):
-            # Update last login (Manual timestamp for MySQL 5.5)
             now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cur.execute("UPDATE users SET last_login_at = %s WHERE user_id = %s", (now, user[0]))
             conn.commit()
             
-            # Set Session State
             st.session_state.update({
                 "logged_in": True,
                 "user_id": user[0],
@@ -97,14 +117,12 @@ def process_registration(email, password):
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Check if user already exists
         cur.execute("SELECT user_id FROM users WHERE email = %s", (email,))
         if cur.fetchone():
             st.error("An account with this email already exists.")
             conn.close()
-            return
+            return False
 
-        # Hash password and Insert (Manual timestamps for MySQL 5.5)
         hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
@@ -115,12 +133,12 @@ def process_registration(email, password):
         cur.execute(sql, (email, hashed, 'free', 0, now))
         conn.commit()
         
-        st.success("✅ Account created! Switch to the Login tab to connect.")
         cur.close()
         conn.close()
+        return True # Return true to trigger the UI change
     except Exception as e:
         st.error(f"Registration Error: {e}")
+        return False
 
 if __name__ == "__main__":
-    # If run standalone for testing
     render_login()
