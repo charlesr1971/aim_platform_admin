@@ -1,56 +1,65 @@
+-- Final MySQL-Compatible Schema
 CREATE TABLE IF NOT EXISTS users (
-    user_id SERIAL PRIMARY KEY,
-    email TEXT UNIQUE NOT NULL,
-    stripe_customer_id TEXT,
-    subscription_tier TEXT DEFAULT 'free',
-    is_admin BOOLEAN DEFAULT FALSE,
-    last_login_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(191) UNIQUE NOT NULL,
+    stripe_customer_id VARCHAR(191),
+    subscription_tier VARCHAR(50) DEFAULT 'free',
+    is_admin TINYINT(1) DEFAULT 0,
+    last_login_at DATETIME,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS companies (
-    company_id SERIAL PRIMARY KEY,
-    ticker TEXT UNIQUE NOT NULL,
-    company_name TEXT NOT NULL,
-    sector TEXT,
+    company_id INT AUTO_INCREMENT PRIMARY KEY,
+    ticker VARCHAR(20) UNIQUE NOT NULL,
+    company_name VARCHAR(255) NOT NULL,
+    sector VARCHAR(100),
     enlarged_share_capital BIGINT DEFAULT 0
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS rns_announcements (
-    rns_id TEXT PRIMARY KEY,
-    company_id INTEGER REFERENCES companies(company_id),
-    timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
-    announcement_type TEXT,
-    headline TEXT,
-    content_body TEXT,
-    sentiment_score REAL,
-    sentiment_rationale TEXT
-);
+    rns_id VARCHAR(100) PRIMARY KEY,
+    company_id INT,
+    timestamp DATETIME NOT NULL,
+    announcement_type VARCHAR(100),
+    headline VARCHAR(255),
+    content_body LONGTEXT,
+    sentiment_score FLOAT,
+    sentiment_rationale TEXT,
+    CONSTRAINT fk_rns_company FOREIGN KEY (company_id) 
+        REFERENCES companies(company_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS daily_prices (
-    price_id SERIAL PRIMARY KEY,
-    company_id INTEGER REFERENCES companies(company_id),
+    price_id INT AUTO_INCREMENT PRIMARY KEY,
+    company_id INT,
     trade_date DATE NOT NULL,
-    open_price REAL,
-    close_price REAL,
+    open_price FLOAT,
+    close_price FLOAT,
     volume BIGINT,
-    day_return REAL,
-    UNIQUE(company_id, trade_date)
-);
+    day_return FLOAT,
+    UNIQUE KEY unq_comp_date (company_id, trade_date),
+    CONSTRAINT fk_price_company FOREIGN KEY (company_id) 
+        REFERENCES companies(company_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS return_predictions (
-    prediction_id SERIAL PRIMARY KEY,
-    company_id INTEGER REFERENCES companies(company_id),
-    user_id INTEGER REFERENCES users(user_id),
-    rns_id TEXT REFERENCES rns_announcements(rns_id),
-    current_stage TEXT,
-    predicted_return_3m REAL,
-    actual_return_3m REAL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+    prediction_id INT AUTO_INCREMENT PRIMARY KEY,
+    company_id INT,
+    user_id INT,
+    rns_id VARCHAR(100),
+    current_stage VARCHAR(50),
+    predicted_return_3m FLOAT,
+    actual_return_3m FLOAT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_pred_company FOREIGN KEY (company_id) REFERENCES companies(company_id),
+    CONSTRAINT fk_pred_user FOREIGN KEY (user_id) REFERENCES users(user_id)
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS user_watchlists (
-    user_id INTEGER REFERENCES users(user_id),
-    company_id INTEGER REFERENCES companies(company_id),
-    PRIMARY KEY (user_id, company_id)
-);
+    user_id INT,
+    company_id INT,
+    PRIMARY KEY (user_id, company_id),
+    CONSTRAINT fk_watch_user FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_watch_company FOREIGN KEY (company_id) REFERENCES companies(company_id)
+) ENGINE=InnoDB;
