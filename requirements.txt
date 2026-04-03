@@ -1,0 +1,12 @@
+streamlit
+pandas
+plotly
+stripe
+anthropic
+psycopg2-binary
+sqlalchemy
+gunicorn
+fastapi
+uvicorn
+python-dotenv
+yfinance
