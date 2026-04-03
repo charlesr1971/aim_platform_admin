@@ -8,24 +8,27 @@ def render_admin_dashboard():
     
     try:
         conn = get_db_connection()
+        # Using buffered=True for MySQL 5.5 stability
+        cursor = conn.cursor(dictionary=True, buffered=True)
         
         # 1. KPI SECTION
         col1, col2, col3 = st.columns(3)
         
-        # Using pd.read_sql - Note: MySQL count(*) returns a column usually named 'count(*)'
-        users_df = pd.read_sql("SELECT count(*) as total FROM users", conn)
-        pro_df = pd.read_sql("SELECT count(*) as total FROM users WHERE subscription_tier = 'pro'", conn)
+        # Total Users
+        cursor.execute("SELECT count(*) as total FROM users")
+        total_users = cursor.fetchone()['total']
         
-        total_users = int(users_df['total'].iloc[0])
-        pro_users = int(pro_df['total'].iloc[0])
+        # Pro Subscribers
+        cursor.execute("SELECT count(*) as total FROM users WHERE subscription_tier = 'pro'")
+        pro_users = cursor.fetchone()['total']
         
         col1.metric("TOTAL USERS", total_users)
         col2.metric("PRO SUBS", pro_users)
         col3.metric("REV ESTIMATE", f"£{pro_users * 29:.2f}")
 
-        # 2. CHURN CHART (Updated for MySQL Syntax)
+        # 2. GROWTH CHART (MySQL 5.5 Syntax)
         st.subheader("USER COHORT GROWTH")
-        # MySQL uses DATE_FORMAT instead of PostgreSQL's date_trunc
+        # We use DATE_FORMAT because MySQL 5.5 doesn't have date_trunc
         growth_query = """
             SELECT DATE_FORMAT(created_at, '%Y-%m-01') as month, count(*) as count 
             FROM users 
@@ -40,27 +43,32 @@ def render_admin_dashboard():
                 paper_bgcolor='rgba(0,0,0,0)', 
                 plot_bgcolor='rgba(0,0,0,0)', 
                 font_color="#00FF41",
-                xaxis_title="Cohort Month",
-                yaxis_title="New Subscribers"
+                xaxis_title="Registration Month",
+                yaxis_title="New Users"
             )
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("No user data available for growth charting.")
+            st.info("No registration data available yet.")
 
-        # 3. USER MANAGEMENT
+        # 3. USER REGISTRY
         st.subheader("SUBSCRIBER REGISTRY")
-        raw_users = pd.read_sql("SELECT user_id, email, subscription_tier, last_login_at, is_admin FROM users", conn)
+        # Pulling raw data for the searchable dataframe
+        raw_users = pd.read_sql("""
+            SELECT user_id, email, subscription_tier, is_admin, last_login_at, created_at 
+            FROM users 
+            ORDER BY created_at DESC
+        """, conn)
         
-        # Convert MySQL TINYINT to readable Boolean for the UI
+        # Convert TINYINT to Boolean for better UI display
         raw_users['is_admin'] = raw_users['is_admin'].astype(bool)
         
         st.dataframe(raw_users, use_container_width=True)
         
+        cursor.close()
         conn.close()
         
     except Exception as e:
-        st.error(f"Admin Data Error: {e}")
-        # Log the error for your Windows Server logs
-        print(f"Admin Dashboard Error: {e}")
+        st.error(f"Admin Dashboard Error: {e}")
 
-# Note: No need for 'if __name__ == "__main__"' as this is called by app.py
+if __name__ == "__main__":
+    render_admin_dashboard()
