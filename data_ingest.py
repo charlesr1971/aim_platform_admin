@@ -4,26 +4,30 @@ import os
 from db_utils import get_db_connection
 from datetime import datetime
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv() # Ensure it pulls ANTHROPIC_API_KEY from your secure .env
+# Load from secure secrets path
+env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
+load_dotenv(dotenv_path=env_path)
 
 AIM_STARTUPS = ["GGP", "JET2", "VLX", "HE1", "HVO"]
 
 def get_claude_sentiment(headline):
-    """Sends headline to Claude 3.5 Sonnet for a sentiment score (-1 to 1)."""
+    """Scores RNS sentiment using the validated Claude 4.6 engine."""
     try:
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        prompt = f"Analyze the following London AIM market RNS headline. Provide a sentiment score between -1.0 (very negative) and 1.0 (very positive). Return ONLY the numerical score: '{headline}'"
+        # UPDATED: Using the exact ID confirmed by your list_models.py
+        model_id = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
         
         message = client.messages.create(
-            model="claude-3-5-sonnet-20240620",
+            model=model_id,
             max_tokens=10,
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": f"Score this AIM RNS headline sentiment from -1.0 to 1.0. Return ONLY the number: {headline}"}]
         )
-        return float(message.content[0].text.strip())
+        return float(message.content.text.strip())
     except Exception as e:
-        print(f"⚠️ Claude Error: {e}")
-        return 0.0
+        print(f"  ⚠️ Claude Error: {e}")
+        return None # Return None to handle gracefully
 
 def ingest_market_data():
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -36,11 +40,10 @@ def ingest_market_data():
     for ticker in AIM_STARTUPS:
         print(f"Processing {ticker}...")
         try:
-            # 1. Fetch Market Prices
             stock = yf.Ticker(f"{ticker}.L")
             info = stock.fast_info
             
-            # 2. Update Company Table
+            # 1. Update Company
             cursor.execute("""
                 INSERT INTO companies (ticker, company_name, enlarged_share_capital)
                 VALUES (%s, %s, %s)
@@ -50,30 +53,32 @@ def ingest_market_data():
             cursor.execute("SELECT company_id FROM companies WHERE ticker = %s", (ticker,))
             company_id = cursor.fetchone()[0]
 
-            # 3. Update Prices
+            # 2. Update Prices
             cursor.execute("""
                 INSERT INTO daily_prices (company_id, trade_date, close_price, volume)
                 VALUES (%s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE close_price = VALUES(close_price), volume = VALUES(volume)
             """, (company_id, datetime.now().date(), info['last_price'], info['last_volume']))
 
-            # 4. NEW: Fetch & Score RNS News
+            # 3. Fetch & Score News
             news = stock.news
             if news:
-                latest_news = news[0] # Get the most recent RNS
-                rns_id = latest_news.get('uuid')
-                headline = latest_news.get('title')
+                latest = news[0]
+                rns_id = latest.get('uuid')
+                headline = latest.get('title')
                 
-                # Only score if we haven't seen this RNS ID before
-                cursor.execute("SELECT rns_id FROM rns_announcements WHERE rns_id = %s", (rns_id,))
-                if not cursor.fetchone():
-                    sentiment = get_claude_sentiment(headline)
-                    
-                    cursor.execute("""
-                        INSERT INTO rns_announcements (rns_id, company_id, timestamp, headline, sentiment_score)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """, (rns_id, company_id, now_str, headline, sentiment))
-                    print(f"  📝 Scored RNS for {ticker}: {sentiment}")
+                if rns_id and headline:
+                    cursor.execute("SELECT rns_id FROM rns_announcements WHERE rns_id = %s", (rns_id,))
+                    if not cursor.fetchone():
+                        sentiment = get_claude_sentiment(headline)
+                        
+                        # Only insert if Claude actually returned a score
+                        if sentiment is not None:
+                            cursor.execute("""
+                                INSERT INTO rns_announcements (rns_id, company_id, timestamp, headline, sentiment_score)
+                                VALUES (%s, %s, %s, %s, %s)
+                            """, (rns_id, company_id, now_str, headline, sentiment))
+                            print(f"  📝 Scored RNS for {ticker}: {sentiment}")
 
             conn.commit()
             print(f"✅ {ticker} fully updated.")
