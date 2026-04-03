@@ -5,7 +5,7 @@ from auth_gate import render_login
 from admin import render_admin_dashboard
 from stripe_handler import create_checkout_session
 from data_engine import fetch_aim_price, get_sentiment
-from db_utils import get_db_connection # NEW: Import your DB utility
+from db_utils import get_db_connection
 from datetime import datetime
 
 # 1. GLOBAL CONFIG & THEME INJECTION
@@ -24,8 +24,6 @@ def apply_custom_styles():
             .ticker { display: inline-block; white-space: nowrap; animation: marquee 60s linear infinite; font-weight: bold; }
             @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
             #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-            
-            /* News Card Styling */
             .news-card { border-left: 5px solid #ff9900; background-color: #111; padding: 15px; margin-bottom: 10px; border-radius: 0 5px 5px 0; }
         </style>
     """, unsafe_allow_html=True)
@@ -37,7 +35,7 @@ if 'logged_in' not in st.session_state:
     render_login()
     st.stop()
 
-# 3. SUCCESS REDIRECT HANDLER (From Stripe)
+# 3. SUCCESS REDIRECT HANDLER
 if st.query_params.get("payment") == "success":
     st.balloons()
     st.success("Subscription Active: Pro Features Unlocked.")
@@ -59,19 +57,18 @@ if st.session_state.get('is_admin'):
         st.stop()
 
 # 6. MAIN INTERFACE
-st.markdown('<div class="ticker-wrap"><div class="ticker">LSE AIM LIVE: GGP.L 7.42 +1.2% | JET2.L 1,420.0 -0.5% | Volex 312.0 +2.1% | Helium One 1.15 +4.5% | Greatland Gold 7.42 +1.2%</div></div>', unsafe_allow_html=True)
+st.markdown('<div class="ticker-wrap"><div class="ticker">LSE AIM LIVE: GGP.L 7.42 +1.2% | JET2.L 1,420.0 -0.5% | Volex 312.0 +2.1% | Helium One 1.15 +4.5%</div></div>', unsafe_allow_html=True)
 st.title("📈 AIM Startup Predictive Terminal")
 
-ticker = st.text_input("ENTER AIM TICKER (e.g. JET2)", "JET2").upper()
+ticker = st.text_input("ENTER AIM TICKER (e.g. JET2)", "GGP").upper()
 
 col1, col2, col3 = st.columns(3)
 
 # --- DATABASE DATA FETCH ---
 try:
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True) # Dictionary cursor for cleaner keys
+    cursor = conn.cursor(dictionary=True, buffered=True)
 
-    # A. Price & Volume Lookup
     cursor.execute("""
         SELECT p.*, c.company_id 
         FROM daily_prices p 
@@ -82,23 +79,22 @@ try:
     db_data = cursor.fetchone()
 
     if db_data:
-        # Check for Unusual Volume (Spike Alert)
-        # Using 500k as a placeholder threshold for now
+        # Volume Spike Alert
         if db_data['volume'] > 1000000:
              st.markdown(f'<div style="background-color:#ff9900; color:black; padding:10px; font-weight:bold; text-align:center; margin-bottom:20px;">🚨 UNUSUAL VOLUME DETECTED: {db_data["volume"]:,} SHARES</div>', unsafe_allow_html=True)
 
-		# Convert GBp to GBP for the display
-		display_price = db_data['close_price'] / 100 if db_data['close_price'] > 5 else db_data['close_price']
-		col1.metric(f"{ticker} PRICE", f"£{display_price:.4f}")
-
+        # Fix Pence to Pounds conversion
+        raw_price = db_data['close_price']
+        display_price = raw_price / 100 if raw_price > 5 else raw_price
+        
+        col1.metric(f"{ticker} PRICE", f"£{display_price:.4f}")
         col2.metric("DAILY VOLUME", f"{db_data['volume']:,}")
         col3.metric("STAGE", "GROWTH")
     else:
-        # Fallback to Live Fetch if not in DB
         price = fetch_aim_price(ticker)
         col1.metric(f"{ticker} PRICE", f"£{price:.2f}")
         col2.metric("DAILY VOLUME", "N/A")
-        col3.metric("STAGE", "UNCATEGORIZED")
+        col3.metric("STAGE", "N/A")
 
     st.markdown("---")
 
@@ -116,7 +112,7 @@ try:
         if news_items:
             for news in news_items:
                 score = news['sentiment_score']
-                color = "#00FF41" if score > 0.2 else "#FF4B4B" if score < -0.2 else "#FF9900"
+                color = "#00FF41" if score > 0.3 else "#FF4B4B" if score < -0.2 else "#FF9900"
                 st.markdown(f"""
                     <div class="news-card" style="border-left-color: {color};">
                         <small style="color:#888;">{news['timestamp'].strftime('%d %b %H:%M')}</small><br>
@@ -128,9 +124,8 @@ try:
             st.info("No recent AI-scored news found for this ticker.")
     
     conn.close()
-
 except Exception as e:
-    st.error(f"Database Integration Error: {e}")
+    st.error(f"System Error: {e}")
 
 st.markdown("---")
 
@@ -138,22 +133,17 @@ st.markdown("---")
 st.subheader("🛡️ ADVANCED ANALYTICS")
 
 if st.session_state.subscription_tier == 'pro':
-    t1, t2 = st.tabs(["🤖 ON-DEMAND ANALYSIS", "📜 BENCHMARK REPORT"])
+    t1, t2 = st.tabs(["🤖 ON-DEMAND", "📜 REPORTS"])
     with t1:
-        st.write("Analyze Unstructured RNS Data manually")
-        rns_text = st.text_area("Paste RNS Content here...")
+        rns_text = st.text_area("Paste RNS Content...")
         if st.button("RUN AI SCORING"):
-            with st.spinner("Claude 4.6 is analyzing..."):
+            with st.spinner("Claude 4.6 analyzing..."):
                 sentiment = get_sentiment(rns_text)
                 st.code(sentiment, language="markdown")
-    with t2:
-        st.write("Generate Institutional PDF")
-        st.button("DOWNLOAD EXCEL/PDF BUNDLE")
 else:
     st.warning("🔒 PREMIUM CONTENT LOCKED")
-    st.info("Upgrade to Pro to unlock the Sentiment Feed, Volume Alerts, and PDF Reports.")
-    if st.button("ACTIVATE PRO TIER (20% OFF WITH 'AIM20')"):
+    if st.button("ACTIVATE PRO TIER"):
         checkout_url = create_checkout_session(st.session_state.email, st.session_state.user_id)
         st.markdown(f'<meta http-equiv="refresh" content="0; url={checkout_url}">', unsafe_allow_html=True)
 
-st.sidebar.caption("System Health: Online | LSEG Data: 15m Delayed")
+st.sidebar.caption("System Health: Online | Claude 4.6 Active")
