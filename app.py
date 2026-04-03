@@ -87,7 +87,10 @@ try:
         if db_data['volume'] > 1000000:
              st.markdown(f'<div style="background-color:#ff9900; color:black; padding:10px; font-weight:bold; text-align:center; margin-bottom:20px;">🚨 UNUSUAL VOLUME DETECTED: {db_data["volume"]:,} SHARES</div>', unsafe_allow_html=True)
 
-        col1.metric(f"{ticker} PRICE", f"£{db_data['close_price']:.2f}")
+		# Convert GBp to GBP for the display
+		display_price = db_data['close_price'] / 100 if db_data['close_price'] > 5 else db_data['close_price']
+		col1.metric(f"{ticker} PRICE", f"£{display_price:.4f}")
+
         col2.metric("DAILY VOLUME", f"{db_data['volume']:,}")
         col3.metric("STAGE", "GROWTH")
     else:
