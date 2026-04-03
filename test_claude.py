@@ -10,8 +10,11 @@ load_dotenv(dotenv_path=env_path)
 def test_ai():
     print("--- Starting AI Handshake Test ---")
     api_key = os.getenv("ANTHROPIC_API_KEY")
-	model_id = os.getenv("CLAUDE_MODEL", "claude-3-haiku-20240307") # Fallback included
+    # Fixed indentation: now strictly 4 spaces
+    model_id = os.getenv("CLAUDE_MODEL", "claude-3-haiku-20240307")
     
+    print(f"Testing Model: {model_id}")
+
     if not api_key:
         print("❌ Error: ANTHROPIC_API_KEY not found in .env")
         return
@@ -19,7 +22,7 @@ def test_ai():
     try:
         client = anthropic.Anthropic(api_key=api_key)
         
-        # Using the most compatible model ID for Tier 1 accounts
+        # Request a response
         message = client.messages.create(
             model=model_id, 
             max_tokens=20,
@@ -29,7 +32,7 @@ def test_ai():
         # Accessing the text content correctly for SDK 0.72.0
         response_text = message.content[0].text
         print(f"🤖 Claude Response: {response_text}")
-        print("✅ Success: API Key is active.")
+        print("✅ Success: API Key and Model are active.")
         
     except Exception as e:
         print(f"❌ Failure: {str(e)}")
