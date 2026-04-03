@@ -10,6 +10,7 @@ load_dotenv(dotenv_path=env_path)
 def test_ai():
     print("--- Starting AI Handshake Test ---")
     api_key = os.getenv("ANTHROPIC_API_KEY")
+	model_id = os.getenv("CLAUDE_MODEL", "claude-3-haiku-20240307") # Fallback included
     
     if not api_key:
         print("❌ Error: ANTHROPIC_API_KEY not found in .env")
@@ -20,7 +21,7 @@ def test_ai():
         
         # Using the most compatible model ID for Tier 1 accounts
         message = client.messages.create(
-            model="claude-3-5-sonnet-20241022", 
+            model=model_id, 
             max_tokens=20,
             messages=[{"role": "user", "content": "Say 'System Online'"}]
         )
