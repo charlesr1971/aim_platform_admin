@@ -55,3 +55,27 @@ CREATE TABLE daily_prices (
     CONSTRAINT fk_price_company FOREIGN KEY (company_id) 
         REFERENCES companies(company_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- Missing MySQL 5.5-Compatible Tables
+CREATE TABLE IF NOT EXISTS return_predictions (
+    prediction_id INT NOT NULL AUTO_INCREMENT,
+    company_id INT,
+    user_id INT,
+    rns_id VARCHAR(100),
+    current_stage VARCHAR(50),
+    predicted_return_3m FLOAT,
+    actual_return_3m FLOAT,
+    created_at DATETIME,
+    PRIMARY KEY (prediction_id),
+    CONSTRAINT fk_pred_company FOREIGN KEY (company_id) REFERENCES companies(company_id),
+    CONSTRAINT fk_pred_user FOREIGN KEY (user_id) REFERENCES users(user_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS user_watchlists (
+    user_id INT,
+    company_id INT,
+    PRIMARY KEY (user_id, company_id),
+    CONSTRAINT fk_watch_user FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_watch_company FOREIGN KEY (company_id) REFERENCES companies(company_id)
+) ENGINE=InnoDB;
+
