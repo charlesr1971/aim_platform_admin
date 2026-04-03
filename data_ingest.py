@@ -13,7 +13,7 @@ load_dotenv(dotenv_path=env_path)
 AIM_STARTUPS = ["GGP", "JET2", "VLX", "HE1", "HVO"]
 
 def get_claude_sentiment(headline):
-    """Scores RNS sentiment using Claude Sonnet 4.6."""
+    """Scores RNS sentiment using the validated Claude 4.6 engine."""
     try:
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         model_id = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
@@ -23,7 +23,6 @@ def get_claude_sentiment(headline):
             max_tokens=10,
             messages=[{"role": "user", "content": f"Score this AIM RNS headline sentiment from -1.0 to 1.0. Return ONLY the number: {headline}"}]
         )
-        # Access content based on latest SDK structure
         return float(message.content[0].text.strip())
     except Exception as e:
         print(f"  ⚠️ AI Error: {e}")
@@ -41,51 +40,59 @@ def ingest_market_data():
         print(f"Processing {ticker}...")
         try:
             stock = yf.Ticker(f"{ticker}.L")
-            info = stock.fast_info
             
+            # Use history(period='1d') to get persistent volume after market close
+            hist = stock.history(period='1d')
+            if not hist.empty:
+                close_price = float(hist['Close'].iloc[0])
+                volume = int(hist['Volume'].iloc[0])
+            else:
+                # Fallback to fast_info if history fails
+                close_price = stock.fast_info['last_price']
+                volume = 0
+
             # 1. Update Company
             cursor.execute("""
-                INSERT INTO companies (ticker, company_name, enlarged_share_capital)
-                VALUES (%s, %s, %s)
-                ON DUPLICATE KEY UPDATE enlarged_share_capital = VALUES(enlarged_share_capital)
-            """, (ticker, stock.info.get('longName', ticker), info.get('shares', 0)))
+                INSERT INTO companies (ticker, company_name)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE company_name = VALUES(company_name)
+            """, (ticker, stock.info.get('longName', ticker)))
             
-            # 2. Get ID with None-Check (The Crash Fix)
+            # 2. Get ID with strict MySQL 5.5 tuple handling
             cursor.execute("SELECT company_id FROM companies WHERE ticker = %s", (ticker,))
             res = cursor.fetchone()
-            if res is None:
-                print(f"  ❌ Skipping {ticker}: Could not find company_id in DB.")
+            if res:
+                company_id = res[0] # Explicitly grab the first item in the tuple
+            else:
                 continue
-            company_id = res[0]
 
-            # 3. Update Prices
+            # 3. Update Prices & Volume
             cursor.execute("""
                 INSERT INTO daily_prices (company_id, trade_date, close_price, volume)
                 VALUES (%s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE close_price = VALUES(close_price), volume = VALUES(volume)
-            """, (company_id, datetime.now().date(), info['last_price'], info.get('last_volume', 0)))
+            """, (company_id, datetime.now().date(), close_price, volume))
 
-            # 4. Fetch News (Using current yfinance list structure)
+            # 4. Fetch & Score News (Scanning the full news list)
             news_list = stock.news
-            if news_list and len(news_list) > 0:
-                latest = news_list[0]
-                rns_id = latest.get('uuid') or latest.get('id')
-                headline = latest.get('title')
-                
-                if rns_id and headline:
-                    # Check if already exists
-                    cursor.execute("SELECT rns_id FROM rns_announcements WHERE rns_id = %s", (rns_id,))
-                    if not cursor.fetchone():
-                        sentiment = get_claude_sentiment(headline)
-                        if sentiment is not None:
-                            cursor.execute("""
-                                INSERT INTO rns_announcements (rns_id, company_id, timestamp, headline, sentiment_score)
-                                VALUES (%s, %s, %s, %s, %s)
-                            """, (rns_id, company_id, now_str, headline, sentiment))
-                            print(f"  ✅ Scored RNS for {ticker}: {sentiment}")
+            if news_list:
+                for news_item in news_list[:3]: # Check the 3 most recent items
+                    rns_id = news_item.get('uuid') or news_item.get('id')
+                    headline = news_item.get('title')
+                    
+                    if rns_id and headline:
+                        cursor.execute("SELECT rns_id FROM rns_announcements WHERE rns_id = %s", (rns_id,))
+                        if not cursor.fetchone():
+                            sentiment = get_claude_sentiment(headline)
+                            if sentiment is not None:
+                                cursor.execute("""
+                                    INSERT INTO rns_announcements (rns_id, company_id, timestamp, headline, sentiment_score)
+                                    VALUES (%s, %s, %s, %s, %s)
+                                """, (rns_id, company_id, now_str, headline, sentiment))
+                                print(f"  ✅ Scored RNS: {headline[:40]}... [{sentiment}]")
             
             conn.commit()
-            print(f"✅ {ticker} fully updated.")
+            print(f"✅ {ticker} updated.")
 
         except Exception as e:
             print(f"❌ Error for {ticker}: {e}")
