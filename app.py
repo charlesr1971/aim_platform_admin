@@ -12,10 +12,17 @@ st.set_page_config(page_title="AIM Insights | Terminal", layout="wide")
 def apply_custom_styles():
     st.markdown("""
         <style>
-            /* Bloomberg/LSEG Dark Terminal Theme */
+            /* Main Terminal Background */
             .stApp { background-color: #050505; color: #00FF41; font-family: 'Courier New', monospace; }
             [data-testid="stSidebar"] { background-color: #111111; border-right: 1px solid #333; }
             
+            /* FIX: Make all Input Labels bright white */
+            label, .stWidgetLabel p {
+                color: #FFFFFF !important;
+                font-weight: bold !important;
+                font-size: 1.1rem !important;
+            }
+
             /* High-Contrast Inputs */
             .stTextInput>div>div>input { background-color: #1a1a1a !important; color: #00FF41 !important; border: 1px solid #00FF41 !important; }
             
@@ -27,14 +34,13 @@ def apply_custom_styles():
             
             /* Metric Styling */
             [data-testid="stMetricValue"] { color: #00FF41 !important; font-size: 2rem; }
-            [data-testid="stMetricDelta"] svg { fill: #00FF41 !important; }
-
-            /* Modern Ticker Tape Marquee */
+            
+            /* Ticker Tape Marquee */
             .ticker-wrap { width: 100%; overflow: hidden; background: #222; color: #ff9900; padding: 10px 0; border-bottom: 1px solid #444; margin-bottom: 20px; }
             .ticker { display: inline-block; white-space: nowrap; animation: marquee 60s linear infinite; font-weight: bold; }
             @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
             
-            /* Hide Streamlit elements for "SaaS" look */
+            /* Hide Streamlit elements */
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
             header {visibility: hidden;}
@@ -103,7 +109,6 @@ if st.session_state.subscription_tier == 'pro':
         st.write("Generate Institutional PDF")
         st.button("DOWNLOAD EXCEL/PDF BUNDLE")
 else:
-    # UPSELL COMPONENT
     st.warning("🔒 PREMIUM CONTENT LOCKED")
     st.info("Upgrade to Pro to unlock Claude-powered RNS Sentiment, PDF Reports, and Dilution Alerts.")
     if st.button("ACTIVATE PRO TIER (20% OFF WITH 'AIM20')"):
