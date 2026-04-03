@@ -25,7 +25,7 @@ def get_claude_sentiment(headline):
             max_tokens=10,
             messages=[{"role": "user", "content": f"Score this AIM RNS headline sentiment from -1.0 to 1.0. Return ONLY the number: {headline}"}]
         )
-        return float(message.content.text.strip())
+        return float(message.content[0].text.strip())
     except Exception as e:
         print(f"    ⚠️ AI Error: {e}")
         return None
@@ -60,17 +60,17 @@ def ingest_market_data():
             cursor.execute("INSERT INTO daily_prices (company_id, trade_date, close_price, volume) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE close_price=VALUES(close_price), volume=VALUES(volume)", 
                            (company_id, datetime.now().date(), close_price, volume))
 
-            # D. NEWS ENGINE (DEBUG MODE)
+            # D. NEWS ENGINE (FIXED NESTING)
             news_list = stock.news
             if news_list:
-                print(f"  🔍 Found {len(news_list)} news items. Inspecting first item...")
-                # DEBUG PRINT: This will show us the EXACT keys Yahoo is using right now
-                print(f"  DEBUG RAW DATA: {news_list[0]}")
+                print(f"  🔍 Found {len(news_list)} news items. Processing...")
                 
                 for item in news_list[:5]:
-                    # Explicitly checking every possible key Yahoo uses
-                    rns_id = item.get('uuid') or item.get('id') or item.get('link')
-                    headline = item.get('title') or item.get('headline')
+                    # NESTING FIX: Yahoo puts the good stuff inside 'content'
+                    content = item.get('content', {})
+                    
+                    rns_id = item.get('id') or content.get('id')
+                    headline = content.get('title')
                     
                     if rns_id and headline:
                         cursor.execute("SELECT rns_id FROM rns_announcements WHERE rns_id = %s", (rns_id,))
@@ -81,8 +81,12 @@ def ingest_market_data():
                                 cursor.execute("INSERT INTO rns_announcements (rns_id, company_id, timestamp, headline, sentiment_score) VALUES (%s, %s, %s, %s, %s)",
                                                (rns_id, company_id, now_str, headline, sentiment))
                                 print(f"    ✅ DB COMMIT: {sentiment}")
+                        else:
+                            # Already in DB
+                            pass
                     else:
-                        print(f"  ⚠️ Skipping: Missing ID ({bool(rns_id)}) or Headline ({bool(headline)})")
+                        # Log if we still can't find it (unlikely now)
+                        print(f"  ⚠️ Skipping item: ID found={bool(rns_id)}, Headline found={bool(headline)}")
             
             conn.commit()
             print(f"✅ {ticker} sync complete.")
