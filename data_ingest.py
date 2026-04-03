@@ -16,15 +16,13 @@ def get_claude_sentiment(headline):
     try:
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         model_id = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
-        
         message = client.messages.create(
             model=model_id,
             max_tokens=10,
             messages=[{"role": "user", "content": f"Score this AIM RNS headline sentiment from -1.0 to 1.0. Return ONLY the number: {headline}"}]
         )
-        return float(message.content[0].text.strip())
-    except Exception as e:
-        print(f"  ⚠️ Claude Error: {e}")
+        return float(message.content.text.strip())
+    except:
         return None
 
 def ingest_market_data():
@@ -39,52 +37,43 @@ def ingest_market_data():
         print(f"Processing {ticker}...")
         try:
             stock = yf.Ticker(f"{ticker}.L")
-            
-            # Use history for persistent volume
             hist = stock.history(period='1d')
-            if not hist.empty:
-                close_price = float(hist['Close'].iloc[0])
-                volume = int(hist['Volume'].iloc[0])
-            else:
-                close_price = stock.fast_info['last_price']
-                volume = 0
+            close_price = float(hist['Close'].iloc[0]) if not hist.empty else 0
+            volume = int(hist['Volume'].iloc[0]) if not hist.empty else 0
 
-            # 1. Update Company
+            # 1. Update Company & Get ID
             cursor.execute("INSERT INTO companies (ticker, company_name) VALUES (%s, %s) ON DUPLICATE KEY UPDATE company_name = VALUES(company_name)", 
                            (ticker, stock.info.get('longName', ticker)))
-            
-            # 2. Get ID
             cursor.execute("SELECT company_id FROM companies WHERE ticker = %s", (ticker,))
             res = cursor.fetchone()
             if not res: continue
             company_id = res[0]
 
-            # 3. Update Prices
+            # 2. Update Prices
             cursor.execute("INSERT INTO daily_prices (company_id, trade_date, close_price, volume) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE close_price = VALUES(close_price), volume = VALUES(volume)",
                            (company_id, datetime.now().date(), close_price, volume))
 
-            # 4. DEBUG NEWS FETCH
+            # 3. ROBUST NEWS FETCH
             news_list = stock.news
-            print(f"  DEBUG: Found {len(news_list) if news_list else 0} news items for {ticker}")
-            
             if news_list:
-                for news_item in news_list[:3]:
-                    # Yahoo changed keys recently - checking both common formats
-                    rns_id = news_item.get('uuid') or news_item.get('id') or news_item.get('link')
-                    headline = news_item.get('title')
+                for news_item in news_list[:5]: # Check top 5
+                    # Senior Dev Fix: Yahoo uses different keys depending on the day/provider
+                    rns_id = news_item.get('uuid') or news_item.get('link') or str(news_item.get('provider_publish_time'))
+                    headline = news_item.get('title') or news_item.get('summary')
                     
                     if rns_id and headline:
+                        # Check if already exists
                         cursor.execute("SELECT rns_id FROM rns_announcements WHERE rns_id = %s", (rns_id,))
                         if not cursor.fetchone():
-                            print(f"  🤖 Sending to Claude: {headline[:30]}...")
+                            print(f"  🤖 AI Scoring: {headline[:40]}...")
                             sentiment = get_claude_sentiment(headline)
                             if sentiment is not None:
                                 cursor.execute("INSERT INTO rns_announcements (rns_id, company_id, timestamp, headline, sentiment_score) VALUES (%s, %s, %s, %s, %s)",
                                                (rns_id, company_id, now_str, headline, sentiment))
-                                print(f"  ✅ Scored: {sentiment}")
+                                print(f"  ✅ DB Committed: {sentiment}")
             
             conn.commit()
-            print(f"✅ {ticker} updated.")
+            print(f"✅ {ticker} fully updated.")
 
         except Exception as e:
             print(f"❌ Error for {ticker}: {e}")
