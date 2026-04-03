@@ -14,26 +14,21 @@ load_dotenv(dotenv_path=env_path)
 AIM_STARTUPS = ["GGP", "JET2", "VLX", "HE1", "HVO"]
 
 def get_claude_sentiment(headline):
-    """Scores RNS sentiment using Claude 4.6 - Corrected for List Response."""
+    """Scores RNS sentiment using Claude 4.6."""
     try:
         api_key = os.getenv("ANTHROPIC_API_KEY")
         model_id = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
-        
-        if not api_key:
-            return None
-
         client = anthropic.Anthropic(api_key=api_key)
-        prompt = f"Score this AIM RNS headline sentiment from -1.0 to 1.0. Return ONLY the number: {headline}"
         
         message = client.messages.create(
             model=model_id,
             max_tokens=10,
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": f"Score this AIM RNS headline sentiment from -1.0 to 1.0. Return ONLY the number: {headline}"}]
         )
-        # FIX: Access the first block in the content list and then the text attribute
-        return float(message.content[0].text.strip())
+        # Using .text attribute for latest Anthropic SDK
+        return float(message.content.text.strip())
     except Exception as e:
-        print(f"  ⚠️ Claude API Error: {e}")
+        print(f"    ⚠️ AI Error: {e}")
         return None
 
 def ingest_market_data():
@@ -41,10 +36,7 @@ def ingest_market_data():
     print(f"--- 📟 Starting AIM Production Ingest: {now_str} ---")
     
     conn = get_db_connection()
-    if not conn:
-        print("❌ Database Connection Failed.")
-        return
-    
+    # Buffered is mandatory for MySQL 5.5 to prevent 'Unread Result' errors
     cursor = conn.cursor(buffered=True) 
 
     for ticker in AIM_STARTUPS:
@@ -52,59 +44,63 @@ def ingest_market_data():
         try:
             stock = yf.Ticker(f"{ticker}.L")
             
-            # A. MARKET DATA FETCH
+            # A. MARKET DATA (HISTORY IS MORE RELIABLE POST-MARKET)
             hist = stock.history(period='1d')
-            if not hist.empty:
-                close_price = float(hist['Close'].iloc[0])
-                volume = int(hist['Volume'].iloc[0])
-            else:
-                close_price = stock.fast_info.get('last_price', 0.0)
-                volume = stock.fast_info.get('last_volume', 0)
+            close_price = float(hist['Close'].iloc[0]) if not hist.empty else 0.0
+            volume = int(hist['Volume'].iloc[0]) if not hist.empty else 0
 
-            # B. UPDATE COMPANIES & GET ID
-            company_name = stock.info.get('longName', ticker)
-            cursor.execute("INSERT INTO companies (ticker, company_name) VALUES (%s, %s) ON DUPLICATE KEY UPDATE company_name = VALUES(company_name)", (ticker, company_name))
+            # B. COMPANY ID (CRITICAL: EXTRACT INT FROM TUPLE)
+            cursor.execute("INSERT INTO companies (ticker, company_name) VALUES (%s, %s) ON DUPLICATE KEY UPDATE company_name=VALUES(company_name)", (ticker, ticker))
             cursor.execute("SELECT company_id FROM companies WHERE ticker = %s", (ticker,))
             res = cursor.fetchone()
-            if not res: continue
-            company_id = res[0]
+            if res:
+                # res[0] extracts the actual Integer ID from the MySQL Tuple (e.g. (1,) -> 1)
+                company_id = int(res[0])
+            else:
+                continue
 
-            # C. UPDATE PRICES
-            trade_date = datetime.now().date()
-            cursor.execute("INSERT INTO daily_prices (company_id, trade_date, close_price, volume) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE close_price = VALUES(close_price), volume = VALUES(volume)", (company_id, trade_date, close_price, volume))
+            # C. PRICE SYNC
+            cursor.execute("""
+                INSERT INTO daily_prices (company_id, trade_date, close_price, volume) 
+                VALUES (%s, %s, %s, %s) 
+                ON DUPLICATE KEY UPDATE close_price=VALUES(close_price), volume=VALUES(volume)
+            """, (company_id, datetime.now().date(), close_price, volume))
 
-            # D. NEWS ENGINE (The Final Fix)
+            # D. NEWS ENGINE (FIXED INDEXING AND KEY DETECTION)
             news_list = stock.news
-            if news_list and len(news_list) > 0:
-                print(f"  🔍 Scanning {len(news_list)} news items for {ticker}...")
-                
+            if news_list:
+                print(f"  🔍 Found {len(news_list)} news items for {ticker}...")
                 for item in news_list[:5]:
-                    # Extract the ID and Headline from the dictionary
+                    # Yahoo News Keys can vary - often 'uuid' or 'id'
                     rns_id = item.get('uuid') or item.get('id') or item.get('link')
-                    # We ensure we are getting the STRING title, not the whole dict
-                    headline = item.get('title') or item.get('headline')
+                    headline = item.get('title')
                     
                     if rns_id and headline:
+                        # Deduplication Check
                         cursor.execute("SELECT rns_id FROM rns_announcements WHERE rns_id = %s", (rns_id,))
                         if not cursor.fetchone():
-                            print(f"  🤖 Scoring: {str(headline)[:60]}...")
+                            print(f"  🤖 AI Scoring: {headline[:50]}...")
                             sentiment = get_claude_sentiment(headline)
-                            
                             if sentiment is not None:
-                                cursor.execute("INSERT INTO rns_announcements (rns_id, company_id, timestamp, headline, sentiment_score) VALUES (%s, %s, %s, %s, %s)",
-                                               (rns_id, company_id, now_str, headline, sentiment))
-                                print(f"  ✅ DB COMMIT: Score {sentiment}")
+                                # INSERT into MySQL 5.5
+                                cursor.execute("""
+                                    INSERT INTO rns_announcements (rns_id, company_id, timestamp, headline, sentiment_score) 
+                                    VALUES (%s, %s, %s, %s, %s)
+                                """, (rns_id, company_id, now_str, headline, sentiment))
+                                print(f"    ✅ DB COMMIT: {sentiment}")
+                        else:
+                            print(f"    ℹ️ Skipping: Already in DB.")
             
             conn.commit()
-            print(f"✅ {ticker} synchronized.")
+            print(f"✅ {ticker} sync complete.")
 
         except Exception as e:
-            print(f"❌ Error: {str(e)}")
+            print(f"❌ Error processing {ticker}: {e}")
             conn.rollback()
 
     cursor.close()
     conn.close()
-    print(f"--- 🏁 Ingest Complete ---")
+    print("--- 🏁 Ingest Complete ---")
 
 if __name__ == "__main__":
     ingest_market_data()
