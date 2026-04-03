@@ -13,6 +13,7 @@ load_dotenv(dotenv_path=env_path)
 AIM_STARTUPS = ["GGP", "JET2", "VLX", "HE1", "HVO"]
 
 def get_claude_sentiment(headline):
+    """Scores RNS sentiment using Claude Sonnet 4.6."""
     try:
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         model_id = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
@@ -22,9 +23,10 @@ def get_claude_sentiment(headline):
             max_tokens=10,
             messages=[{"role": "user", "content": f"Score this AIM RNS headline sentiment from -1.0 to 1.0. Return ONLY the number: {headline}"}]
         )
+        # Access content based on latest SDK structure
         return float(message.content[0].text.strip())
     except Exception as e:
-        print(f"  ⚠️ Claude Error: {e}")
+        print(f"  ⚠️ AI Error: {e}")
         return None
 
 def ingest_market_data():
@@ -48,27 +50,30 @@ def ingest_market_data():
                 ON DUPLICATE KEY UPDATE enlarged_share_capital = VALUES(enlarged_share_capital)
             """, (ticker, stock.info.get('longName', ticker), info.get('shares', 0)))
             
+            # 2. Get ID with None-Check (The Crash Fix)
             cursor.execute("SELECT company_id FROM companies WHERE ticker = %s", (ticker,))
-            company_id = cursor.fetchone()[0]
+            res = cursor.fetchone()
+            if res is None:
+                print(f"  ❌ Skipping {ticker}: Could not find company_id in DB.")
+                continue
+            company_id = res[0]
 
-            # 2. Update Prices
+            # 3. Update Prices
             cursor.execute("""
                 INSERT INTO daily_prices (company_id, trade_date, close_price, volume)
                 VALUES (%s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE close_price = VALUES(close_price), volume = VALUES(volume)
-            """, (company_id, datetime.now().date(), info['last_price'], info['last_volume']))
+            """, (company_id, datetime.now().date(), info['last_price'], info.get('last_volume', 0)))
 
-            # 3. Fetch News (Improved Logic)
+            # 4. Fetch News (Using current yfinance list structure)
             news_list = stock.news
             if news_list and len(news_list) > 0:
                 latest = news_list[0]
-                # Fallback check for different key names
-                rns_id = latest.get('uuid') or latest.get('id') or latest.get('link')
+                rns_id = latest.get('uuid') or latest.get('id')
                 headline = latest.get('title')
                 
-                print(f"  🔍 Found News for {ticker}: {headline[:50]}...")
-
                 if rns_id and headline:
+                    # Check if already exists
                     cursor.execute("SELECT rns_id FROM rns_announcements WHERE rns_id = %s", (rns_id,))
                     if not cursor.fetchone():
                         sentiment = get_claude_sentiment(headline)
@@ -77,12 +82,10 @@ def ingest_market_data():
                                 INSERT INTO rns_announcements (rns_id, company_id, timestamp, headline, sentiment_score)
                                 VALUES (%s, %s, %s, %s, %s)
                             """, (rns_id, company_id, now_str, headline, sentiment))
-                            print(f"  ✅ Scored RNS: {sentiment}")
-            else:
-                print(f"  ℹ️ No new RNS found for {ticker} today.")
-
+                            print(f"  ✅ Scored RNS for {ticker}: {sentiment}")
+            
             conn.commit()
-            print(f"✅ {ticker} updated.")
+            print(f"✅ {ticker} fully updated.")
 
         except Exception as e:
             print(f"❌ Error for {ticker}: {e}")
