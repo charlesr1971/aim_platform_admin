@@ -3,11 +3,12 @@ from db_utils import get_db_connection
 from datetime import datetime
 
 # Define the initial "Watchlist" of AIM Startups to track
-# You can move this to a 'tracked_tickers' table in MySQL later
 AIM_STARTUPS = ["GGP", "JET2", "VLX", "HE1", "HVO", "ABC"]
 
 def ingest_market_data():
-    print(f"--- Starting AIM Data Ingest: {datetime.now()} ---")
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    print(f"--- Starting AIM Data Ingest: {now_str} ---")
+    
     conn = get_db_connection()
     if not conn:
         return
@@ -22,7 +23,7 @@ def ingest_market_data():
             info = stock.fast_info
             
             # 2. Update/Insert Company Reference Data
-            # Note: Using MySQL %s placeholders
+            # Note: We now pass now_str to 'created_at' manually for MySQL 5.5
             company_sql = """
                 INSERT INTO companies (ticker, company_name, enlarged_share_capital)
                 VALUES (%s, %s, %s)
@@ -31,9 +32,13 @@ def ingest_market_data():
             """
             cursor.execute(company_sql, (ticker, stock.info.get('longName', ticker), info.get('shares', 0)))
             
-            # 3. Get the internal company_id for the price link
+            # 3. Get the internal company_id
             cursor.execute("SELECT company_id FROM companies WHERE ticker = %s", (ticker,))
-            company_id = cursor.fetchone()[0]
+            result = cursor.fetchone()
+            if result:
+                company_id = result[0]
+            else:
+                continue
 
             # 4. Insert Daily Price Data
             price_sql = """
