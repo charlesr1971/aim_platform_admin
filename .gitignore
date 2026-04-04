@@ -3,3 +3,11 @@ __pycache__/
 *.pyc
 .streamlit/
 aim_market.db
+
+# Windows Batch Scripts
+*.bat
+*.cmd
+
+# Local Backups
+backups/
+*.sql
