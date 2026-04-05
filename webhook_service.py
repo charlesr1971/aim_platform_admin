@@ -34,5 +34,5 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
 
 @app.get("/health")
 def health_check():
-    """Verifies the tunnel: ://establishmindfulness.com -> IIS -> FastAPI"""
+    """Verifies the tunnel: ://portfolio.establishmindfulness.com -> IIS -> FastAPI"""
     return {"status": "online", "domain": "://portfolio.establishmindfulness.com"}
