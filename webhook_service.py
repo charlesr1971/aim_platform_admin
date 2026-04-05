@@ -32,7 +32,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         # 200 avoids Stripe retrying for events we don't care about
         return {"status": "ignored"}
 
-@app.get("/health")
+@app.get("/api/health")
 def health_check():
     """Verifies the tunnel: ://portfolio.establishmindfulness.com -> IIS -> FastAPI"""
     return {"status": "online", "domain": "://portfolio.establishmindfulness.com"}
