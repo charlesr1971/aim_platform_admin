@@ -4,40 +4,44 @@ import os
 from db_utils import get_db_connection
 from stripe_handler import handle_webhook_payload
 from dotenv import load_dotenv
+from pathlib import Path
 
-# 1. SETUP
-load_dotenv()
+# 1. SECURE SETUP
+env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
+load_dotenv(dotenv_path=env_path)
+
 app = FastAPI()
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
 
-@app.post("/webhook")
+# 2. UPDATED ROUTE: Matches https://establishmindfulness.com
+@app.post("/api/webhook")
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
     """
     Endpoint for Stripe to POST events to.
-    Verifies signature and updates user tier in Postgres.
+    Verifies signature and updates user tier in MySQL 5.5.
     """
     payload = await request.body()
     
-    # Check if signature exists
     if not stripe_signature:
         raise HTTPException(status_code=400, detail="Missing Stripe Signature")
 
     try:
-        # 2. VERIFY & PROCESS
-        # This calls the logic we refined in stripe_handler.py
+        # Pass the payload and signature to your robust handler in stripe_handler.py
         success = handle_webhook_payload(payload, stripe_signature)
         
         if success:
             return {"status": "success", "message": "User upgraded to Pro"}
         else:
-            return {"status": "ignored", "message": "Event type not handled or verification failed"}
+            # We return 200/Success even if ignored to stop Stripe from retrying 
+            # for events we don't care about (like 'plan.created')
+            return {"status": "ignored"}
 
     except Exception as e:
+        print(f"❌ Webhook Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/health")
 def health_check():
-    return {"status": "online", "service": "AIM Insights Webhook Listener"}
+    return {"status": "online", "domain": "://establishmindfulness.com"}
 
-# To run locally: uvicorn webhook_service:app --port 8000
+# Run via: uvicorn webhook_service:app --port 8000 --host 127.0.0.1
