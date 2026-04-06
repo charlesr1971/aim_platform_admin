@@ -7,107 +7,56 @@ from stripe_handler import create_checkout_session
 from data_engine import fetch_aim_price, get_sentiment
 from db_utils import get_db_connection
 from datetime import datetime
-import os
-from dotenv import load_dotenv
-from pathlib import Path
 
-# 1. SECURE ENVIRONMENT LOAD
-env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
-load_dotenv(dotenv_path=env_path)
+# 1. GLOBAL CONFIG & THEME INJECTION
+st.set_page_config(page_title="AIM Insights | Terminal", layout="wide")
 
-# 2. GLOBAL CONFIG
-st.set_page_config(page_title="AIM Insights | Terminal", layout="wide", initial_sidebar_state="expanded")
-
-def apply_modern_ui():
+def apply_custom_styles():
     st.markdown("""
         <style>
-            /* Force Modern Sans-Serif Font */
-            @import url('https://googleapis.com');
-            html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-            /* Main Background (Light/Professional) */
-            .stApp { background-color: #f8fafc; color: #1e293b; }
-
-            /* SLATE DARK SIDEBAR (The ECharts Look) */
-            [data-testid="stSidebar"] { 
-                background-color: #1e293b !important; 
-                border-right: 1px solid #334155; 
-            }
-            [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, 
-            [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p,
-            [data-testid="stSidebar"] span, [data-testid="stSidebar"] label,
-            [data-testid="stSidebar"] .stMarkdown { color: #f1f5f9 !important; }
-
-            /* MODERN TICKER WRAP (Updated for Light UI) */
-            .ticker-wrap { 
-                width: 100%; overflow: hidden; background: #334155; color: #00FF41; 
-                padding: 12px 0; border-bottom: 2px solid #3b82f6; margin-bottom: 20px; 
-            }
-            .ticker { display: inline-block; white-space: nowrap; animation: marquee 60s linear infinite; font-weight: 700; font-family: monospace; }
+            .stApp { background-color: #050505; color: #00FF41; font-family: 'Courier New', monospace; }
+            [data-testid="stSidebar"] { background-color: #111111; border-right: 1px solid #333; }
+            label, .stWidgetLabel p { color: #FFFFFF !important; font-weight: bold !important; font-size: 1.1rem !important; }
+            .stTextInput>div>div>input { background-color: #1a1a1a !important; color: #00FF41 !important; border: 1px solid #00FF41 !important; }
+            .stButton>button { background-color: #ff9900 !important; color: #000 !important; border-radius: 0px !important; font-weight: bold; width: 100%; border: none; }
+            [data-testid="stMetricValue"] { color: #00FF41 !important; font-size: 2rem; }
+            .ticker-wrap { width: 100%; overflow: hidden; background: #222; color: #ff9900; padding: 10px 0; border-bottom: 1px solid #444; margin-bottom: 20px; }
+            .ticker { display: inline-block; white-space: nowrap; animation: marquee 60s linear infinite; font-weight: bold; }
             @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-
-            /* WHITE DATA CARDS (Replaces Metric Text) */
-            div[data-testid="stMetric"] {
-                background-color: #ffffff;
-                border: 1px solid #e2e8f0;
-                padding: 1.5rem;
-                border-radius: 12px;
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            }
-            [data-testid="stMetricValue"] { color: #1e293b !important; font-weight: 700 !important; }
-            [data-testid="stMetricLabel"] { color: #64748b !important; font-weight: 600 !important; }
-
-            /* CLEAN NEWS CARDS */
-            .news-card { 
-                border-left: 5px solid #3b82f6; background-color: #ffffff; 
-                padding: 20px; margin-bottom: 12px; border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-                border: 1px solid #f1f5f9;
-            }
-
-            /* HIDE DEFAULT DECORATORS */
             #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-
-            /* MODERN BUTTONS */
-            .stButton>button { 
-                background-color: #3b82f6 !important; color: white !important; 
-                border-radius: 8px !important; font-weight: 600; width: 100%; border: none; 
-                padding: 0.5rem; transition: all 0.3s ease;
-            }
-            .stButton>button:hover { background-color: #2563eb !important; transform: translateY(-1px); }
+            .news-card { border-left: 5px solid #ff9900; background-color: #111; padding: 15px; margin-bottom: 10px; border-radius: 0 5px 5px 0; }
         </style>
     """, unsafe_allow_html=True)
 
-apply_modern_ui()
+apply_custom_styles()
 
-# 3. AUTHENTICATION & SESSION MANAGEMENT
+# 2. AUTHENTICATION & SESSION MANAGEMENT
 if 'logged_in' not in st.session_state:
     render_login()
     st.stop()
 
-# 4. SUCCESS REDIRECT HANDLER
+# 3. SUCCESS REDIRECT HANDLER
 if st.query_params.get("payment") == "success":
     st.balloons()
     st.success("Subscription Active: Pro Features Unlocked.")
 
-# 5. SIDEBAR & NAVIGATION
+# 4. SIDEBAR & NAVIGATION
 st.sidebar.title(f"📟 {st.session_state.email}")
-st.sidebar.markdown(f"**TIER:** `{st.session_state.subscription_tier.upper()}`")
+st.sidebar.markdown(f"**TIER:** {st.session_state.subscription_tier.upper()}")
 
 if st.sidebar.button("LOGOUT"):
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.rerun()
 
-# 6. ADMIN ROUTING
+# 5. ADMIN ROUTING
 if st.session_state.get('is_admin'):
-    st.sidebar.markdown("---")
-    show_admin = st.sidebar.toggle("🛠️ ADMIN PANEL", value=False)
+    show_admin = st.sidebar.toggle("ADMIN PANEL", value=False)
     if show_admin:
         render_admin_dashboard()
         st.stop()
 
-# 7. MAIN INTERFACE
+# 6. MAIN INTERFACE
 st.markdown('<div class="ticker-wrap"><div class="ticker">LSE AIM LIVE: GGP.L 7.42 +1.2% | JET2.L 1,420.0 -0.5% | Volex 312.0 +2.1% | Helium One 1.15 +4.5%</div></div>', unsafe_allow_html=True)
 st.title("📈 AIM Startup Predictive Terminal")
 
@@ -130,10 +79,11 @@ try:
     db_data = cursor.fetchone()
 
     if db_data:
-        # Volume Spike Alert (Updated for Modern UI)
+        # Volume Spike Alert
         if db_data['volume'] > 1000000:
-             st.markdown(f'<div style="background-color:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; padding:15px; border-radius:10px; font-weight:600; text-align:center; margin-bottom:20px;">🚨 UNUSUAL VOLUME DETECTED: {db_data["volume"]:,} SHARES</div>', unsafe_allow_html=True)
+             st.markdown(f'<div style="background-color:#ff9900; color:black; padding:10px; font-weight:bold; text-align:center; margin-bottom:20px;">🚨 UNUSUAL VOLUME DETECTED: {db_data["volume"]:,} SHARES</div>', unsafe_allow_html=True)
 
+        # Fix Pence to Pounds conversion
         raw_price = db_data['close_price']
         display_price = raw_price / 100 if raw_price > 5 else raw_price
         
@@ -162,11 +112,11 @@ try:
         if news_items:
             for news in news_items:
                 score = news['sentiment_score']
-                color = "#10b981" if score > 0.3 else "#ef4444" if score < -0.2 else "#f59e0b"
+                color = "#00FF41" if score > 0.3 else "#FF4B4B" if score < -0.2 else "#FF9900"
                 st.markdown(f"""
                     <div class="news-card" style="border-left-color: {color};">
-                        <small style="color:#64748b;">{news['timestamp'].strftime('%d %b %H:%M')}</small><br>
-                        <b style="color:#1e293b; font-size:1.1rem;">{news['headline']}</b><br>
+                        <small style="color:#888;">{news['timestamp'].strftime('%d %b %H:%M')}</small><br>
+                        <b style="color:white;">{news['headline']}</b><br>
                         <span style="color:{color}; font-weight:bold;">AI SENTIMENT: {score}</span>
                     </div>
                 """, unsafe_allow_html=True)
@@ -194,8 +144,6 @@ else:
     st.warning("🔒 PREMIUM CONTENT LOCKED")
     if st.button("ACTIVATE PRO TIER"):
         checkout_url = create_checkout_session(st.session_state.email, st.session_state.user_id)
-        # Using markdown redirect for reliability on Windows 2019
         st.markdown(f'<meta http-equiv="refresh" content="0; url={checkout_url}">', unsafe_allow_html=True)
 
-st.sidebar.markdown("---")
 st.sidebar.caption("System Health: Online | Claude 4.6 Active")
