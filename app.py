@@ -40,25 +40,56 @@ def apply_modern_ui():
             [data-testid="stSidebar"] .stMarkdown { color: #f1f5f9 !important; }
 
             /* CUSTOM EMAIL BOX (Left Bar) */
-            .user-email-box {
-                background-color: #11467D;
+            .user-data-box {
+                background-color: #193455;
                 color: rgba(255, 255, 255, 0.75);
-                font-size: 14px;
-                padding: 14px;
-                border-radius: 8px;
+                font-size: 16px;
+                padding: 0.5rem;
+                border-radius: 25px;
                 text-decoration: none !important;
                 margin-bottom: 10px;
                 display: block;
                 text-align: center;
-                font-weight: 500;
+                font-weight: 600;
+            }
+            
+            .user-data-box a:link {
+                text-decoration: none !important;
+            }
+            
+            .user-data-box a:visited {
+                text-decoration: none !important;
+            }
+            
+            .user-data-box a:hover {
+                text-decoration: none !important;
+            }
+            
+            .user-data-box a:active {
+                text-decoration: none !important;
+            }
+            
+            .user-data-box.last-of-type {
+                margin-bottom: 20px;
             }
 
             /* MODERN TICKER WRAP */
             .ticker-wrap { 
-                width: 100%; overflow: hidden; background: #334155; color: #00FF41; 
-                padding: 12px 0; border-bottom: 2px solid #3b82f6; margin-bottom: 20px; 
+                width: 100%; 
+                overflow: hidden; 
+                background: #334155; 
+                color: #00FF41; 
+                padding: 12px 0;  
+                margin-bottom: 20px; 
             }
-            .ticker { display: inline-block; white-space: nowrap; animation: marquee 60s linear infinite; font-weight: 700; font-family: monospace; }
+            .ticker { 
+                display: inline-block; 
+                white-space: nowrap; 
+                animation: marquee 60s 
+                linear infinite; font-
+                weight: 700; font-
+                family: monospace; 
+            }
             @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
 
             /* WHITE DATA CARDS */
@@ -109,8 +140,8 @@ if st.query_params.get("payment") == "success":
 st.sidebar.title("AIM Terminal") # Icon Removed
 
 # Custom Email Box
-st.sidebar.markdown(f'<div class="user-email-box">{st.session_state.email}</div>', unsafe_allow_html=True)
-st.sidebar.markdown(f"**TIER:** `{st.session_state.subscription_tier.upper()}`")
+st.sidebar.markdown(f'<div class="user-data-box">{st.session_state.email}</div>', unsafe_allow_html=True)
+st.sidebar.markdown(f'<div class="user-data-box last-of-type">TIER: {st.session_state.subscription_tier.upper()}</div>', unsafe_allow_html=True)
 
 if st.sidebar.button("LOGOUT"):
     for key in list(st.session_state.keys()):
@@ -182,7 +213,7 @@ try:
                 score = news['sentiment_score']
                 color = "#10b981" if score > 0.3 else "#ef4444" if score < -0.2 else "#f59e0b"
                 st.markdown(f"""
-                    <div class="news-card" style="border-left-color: {color};">
+                    <div class="news-card" style="border-left-color: {color};border-left-width:10px;">
                         <small style="color:#64748b;">{news['timestamp'].strftime('%d %b %H:%M')}</small><br>
                         <b style="color:#1e293b; font-size:1.1rem;">{news['headline']}</b><br>
                         <span style="color:{color}; font-weight:bold;">AI SENTIMENT: {score}</span>
