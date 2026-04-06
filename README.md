@@ -7,21 +7,21 @@ This platform provides a multi-user subscription service for tracking AIM London
 
 To run this project, you must define the following variables in your .env file (local).
 
-## Database (MySQL)
+## Database: MySQL
 
 * MySQL 
 
-## AI & Market Data (Anthropic)
+## AI & Market Data: Anthropic
 
 * ANTHROPIC_API_KEY: Your Claude 3.5 Sonnet API key. This powers the data_engine.py sentiment scoring.
 * LSEG_API_KEY: (Optional) If using the official LSEG NewsML feed instead of standard scraping.
 
-## Payments (Stripe)
+## Payments: Stripe
 
 * STRIPE_SECRET_KEY: Your sk_test_... or sk_live_... key.
 * STRIPE_WEBHOOK_SECRET: Your whsec_... key. Generate this via the Stripe CLI during local testing or the Stripe Dashboard for production.
 * STRIPE_PRICE_ID: The ID of your "Pro" subscription product (e.g., price_12345...).
-* BASE_URL: The live URL of your app (e.g., https://herokuapp.com). Used for Stripe redirect success/cancel loops.
+* BASE_URL: The live URL of your app (e.g., https://portfolio.establishmindfulness.com). Used for Stripe redirect success/cancel loops.
 
 ## 🚀 Deployment Instructions## 1. Database Setup
 
@@ -35,7 +35,7 @@ Execute the provided schema.sql on your MySQL instance before launching the app 
    4. Use the Stripe CLI to forward events:
    stripe listen --forward-to localhost:8000/api/webhook
 
-## Production (Windows 2019 VPS)
+## Production: Windows 2019 VPS
 
 The included Procfile handles the parallel execution of the dashboard and the webhook listener:
 
@@ -50,11 +50,11 @@ UPDATE users SET is_admin = TRUE, subscription_tier = 'pro' WHERE email = 'your-
 
 Since this platform uses a standard MySQL schema, you can migrate your data, using Navicat MySQL or mysqldump.exe. This ensures your historical RNS Sentiment scores and ROI Predictions are never locked into a single vendor.
 
-## Exporting Data (Dump)
+## Exporting Data: Dump
 
 Use mysqldump.exe to create a compressed archive of your entire AIM dataset, including all user subscription states.
 
-## Importing Data (Restore)
+## Importing Data: Restore
 
 Before restoring, ensure you have run the schema.sql on the new instance to initialize the table structures.
 
