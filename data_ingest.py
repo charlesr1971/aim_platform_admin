@@ -11,7 +11,7 @@ from pathlib import Path
 env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
 load_dotenv(dotenv_path=env_path)
 
-AIM_STARTUPS = ["GGP", "JET2", "VLX", "HE1", "HVO"]
+AIM_STARTUPS = ["GGP", "JET2", "VLX", "HE1", "HVO", "KOD"]
 
 def get_claude_sentiment(headline):
     """Scores RNS sentiment using Claude 4.6."""
