@@ -55,8 +55,10 @@ def handle_webhook_payload(payload, sig_header):
     # 1. Handle Successful Payment/Subscription
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
-		# Just print the IDs to verify they aren't Non
-		print(f"📦 Webhook Received - Cust: {session.get('customer')} | Sub: {session.get('subscription')}")
+        
+        # Verify IDs are arriving from Stripe
+        print(f"📦 Webhook Received - Cust: {session.get('customer')} | Sub: {session.get('subscription')}")
+        
         user_id = session['metadata'].get('user_id')
         
         # Capture the relevant Stripe IDs
