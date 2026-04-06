@@ -18,16 +18,36 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 3. MODERN UI CSS INJECTION (The "ECharts" Look)
+# 3. THE "ECHARTS" MODERN UI INJECTION
 def apply_modern_ui():
     st.markdown("""
         <style>
-            /* Main App Background */
+            /* Force Modern Font */
+            @import url('https://googleapis.com');
+            
+            html, body, [class*="css"] {
+                font-family: 'Inter', sans-serif;
+            }
+
+            /* Main Background */
             .stApp {
                 background-color: #f8fafc;
             }
             
-            /* High-End Card Styling for Metrics */
+            /* FORCE DARK SIDEBAR (The ECharts Look) */
+            [data-testid="stSidebar"] {
+                background-color: #1e293b !important;
+                color: #f1f5f9 !important;
+            }
+            
+            /* Fix Sidebar Text/Headers to be White */
+            [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, 
+            [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p,
+            [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {
+                color: #f1f5f9 !important;
+            }
+
+            /* Modern White Cards for Tickers */
             div[data-testid="stMetric"] {
                 background-color: #ffffff;
                 border: 1px solid #e2e8f0;
@@ -35,13 +55,13 @@ def apply_modern_ui():
                 border-radius: 12px;
                 box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
             }
-
-            /* Sidebar Border for Clean Separation */
-            section[data-testid="stSidebar"] {
-                border-right: 1px solid #334155;
+            
+            /* Metric Labels (Black text on white cards) */
+            [data-testid="stMetricLabel"] {
+                color: #64748b !important;
             }
 
-            /* Modern Blue Buttons */
+            /* Clean Blue Buttons */
             .stButton > button {
                 width: 100%;
                 border-radius: 8px;
@@ -50,28 +70,11 @@ def apply_modern_ui():
                 border: none;
                 padding: 0.6rem;
                 font-weight: 600;
-                transition: all 0.3s ease;
             }
-            .stButton > button:hover {
-                background-color: #2563eb;
-                border: none;
-                color: white;
-                transform: translateY(-1px);
-            }
-
-            /* Clean Typography */
-            h1, h2, h3 {
-                color: #0f172a;
-                font-family: 'Inter', sans-serif;
-                font-weight: 700 !important;
-            }
-
-            /* Table/Dataframe Styling */
-            .stDataFrame {
-                background-color: #ffffff;
-                border-radius: 12px;
-                padding: 10px;
-                border: 1px solid #e2e8f0;
+            
+            /* Hide Streamlit Header/Footer Decorators */
+            header, footer {
+                display: none !important;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -79,7 +82,7 @@ def apply_modern_ui():
 apply_modern_ui()
 
 def get_market_data():
-    """Fetches latest prices and sentiment for the dashboard."""
+    """Fetches latest prices and sentiment."""
     conn = get_db_connection()
     if not conn:
         return pd.DataFrame()
@@ -97,13 +100,11 @@ def get_market_data():
     return df
 
 def main():
-    # --- SIDEBAR NAV ---
+    # --- SIDEBAR ---
     st.sidebar.title("AIM Terminal")
     st.sidebar.markdown("---")
     
-    # Mock user for now (Integration with login coming next)
     user_id = 1 
-    
     conn = get_db_connection()
     if conn:
         cursor = conn.cursor(dictionary=True)
@@ -115,7 +116,6 @@ def main():
             st.sidebar.write(f"Status: `{user['subscription_tier'].upper()}`")
             
             if user['subscription_tier'] == 'free':
-                st.sidebar.warning("Upgrade to PRO for real-time AI Sentiment")
                 if st.sidebar.button("🚀 Unlock PRO Tier"):
                     checkout_url = create_checkout_session(user['email'], user_id)
                     if checkout_url:
@@ -130,7 +130,6 @@ def main():
     df = get_market_data()
     
     if not df.empty:
-        # Row 1: Key Metrics
         cols = st.columns(len(df))
         for i, row in df.iterrows():
             with cols[i]:
@@ -144,7 +143,7 @@ def main():
         st.subheader("Deep Dive Analysis")
         st.dataframe(df, use_container_width=True)
     else:
-        st.info("No market data found. Please run the Data Ingest script.")
+        st.info("No market data found. Run the Data Ingest script.")
 
 if __name__ == "__main__":
     main()
