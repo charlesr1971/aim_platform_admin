@@ -39,7 +39,9 @@ def render_login():
 
 
     # Toggle between Login and Registration
-    tab1, tab2 = st.tabs(["🔑 Login", "📝 Create Account"])
+    # tab1, tab2 = st.tabs(["🔑 Login", "📝 Create Account"])
+    # tab1, tab2 = st.tabs([":lock: Login", ":pencil: Create Account"])
+    tab1, tab2 = st.tabs(["Login", "Create Account"])
 
     # --- TAB 1: LOGIN ---
     with tab1:

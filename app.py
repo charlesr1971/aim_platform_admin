@@ -306,10 +306,9 @@ def apply_modern_ui():
             
             /* --- CIRCULAR LOGO STYLING --- */
             .logo-container {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                width: 100%;
+                width: 100% !important;
+                display: block !important; /* Switch from flex to block for absolute centering */
+                text-align: center !important;
                 margin-bottom: 15px;
                 padding-top: 10px;
             }
@@ -317,11 +316,16 @@ def apply_modern_ui():
             .logo-circular {
                 width: 50px;
                 height: 50px;
-                border-radius: 50%; /* Makes it a circle */
+                border-radius: 50%;
                 object-fit: cover;
-                border: 2px solid rgba(255, 255, 255, 0.2); /* Subtle light border */
-                background-color: white; /* Ensures no transparency issues */
+                border: 2px solid rgba(255, 255, 255, 0.2);
+                background-color: white;
+                /* THE REAL FIX: */
+                margin: 0 auto !important; 
+                display: block !important;
             }
+
+
 
             
             /* 1. IMPORT FONT AWESOME 4 */
@@ -388,11 +392,12 @@ if st.query_params.get("payment") == "success":
 
 st.sidebar.markdown("""
     <div class="logo-container">
-        <img src="static/assets/images/png/logo/logo-597x597.png" class="logo-circular">
+        <img src="app/static/assets/images/png/logo/logo-597x597.png" class="logo-circular" style="margin-bottom:20px;">
     </div>
 """, unsafe_allow_html=True)
 
-st.sidebar.title("AIM Terminal") # Icon Removed
+# st.sidebar.title("AIM Terminal") # Icon Removed
+st.sidebar.title("") # Icon Removed
 
 # Custom Email Box
 st.sidebar.markdown(f'<div class="user-data-box"><div class="user-data-box-icon-panel"></div><i class="fa fa-user"></i> {st.session_state.email}</div>', unsafe_allow_html=True)
