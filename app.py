@@ -185,7 +185,8 @@ def apply_modern_ui():
             .ticker-wrap { 
                 width: 100%; 
                 overflow: hidden; 
-                background: #334155; 
+                /* background: #334155; */
+                background: #1e293b;
                 color: #00FF41; 
                 padding: 12px 0;  
                 margin-bottom: 20px; 
@@ -193,12 +194,21 @@ def apply_modern_ui():
             .ticker { 
                 display: inline-block; 
                 white-space: nowrap; 
-                animation: marquee 60s 
-                linear infinite; font-
-                weight: 700; font-
-                family: monospace; 
+                animation: marquee 45s linear infinite; 
+                font-weight: 700; 
+                /* font-family: monospace; */
+                font-family: 'Courier New', monospace; 
             }
-            @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+            
+            
+            @keyframes marquee { 
+                0% { 
+                    transform: translateX(100%);
+                } 
+                100% { 
+                    transform: translateX(-100%); 
+                } 
+            }
 
             /* WHITE DATA CARDS */
             div[data-testid="stMetric"] {
@@ -304,6 +314,32 @@ def apply_modern_ui():
     st.markdown("""
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     """, unsafe_allow_html=True)
+    
+def get_live_ticker_string():
+    """Fetches the latest prices for all tracked companies to build the marquee."""
+    try:
+        conn = get_db_connection()
+        query = """
+            SELECT c.ticker, p.close_price, p.day_return 
+            FROM companies c
+            JOIN daily_prices p ON c.company_id = p.company_id
+            WHERE p.trade_date = (SELECT MAX(trade_date) FROM daily_prices)
+        """
+        df = pd.read_sql(query, conn)
+        conn.close()
+
+        # Build the string: TICKER PRICE (RETURN%)
+        ticker_items = []
+        for _, row in df.iterrows():
+            arrow = "▲" if row['day_return'] >= 0 else "▼"
+            color = "#00FF41" if row['day_return'] >= 0 else "#FF4B4B"
+            item = f"{row['ticker']}.L {row['close_price']:.2f} {arrow} {row['day_return']:.1f}%"
+            ticker_items.append(item)
+        
+        return " | ".join(ticker_items)
+    except:
+        return "DATA TEMPORARILY UNAVAILABLE"
+
 
 apply_modern_ui()
 
@@ -362,8 +398,16 @@ if st.session_state.get('is_admin'):
 
 
 # 7. MAIN INTERFACE
-st.markdown('<div class="ticker-wrap"><div class="ticker">LSE AIM LIVE: GGP.L 7.42 +1.2% | JET2.L 1,420.0 -0.5% | Volex 312.0 +2.1% | Helium One 1.15 +4.5%</div></div>', unsafe_allow_html=True)
+# st.markdown('<div class="ticker-wrap"><div class="ticker">LSE AIM LIVE: GGP.L 7.42 +1.2% | JET2.L 1,420.0 -0.5% | Volex 312.0 +2.1% | Helium One 1.15 +4.5%</div></div>', unsafe_allow_html=True)
 # st.title("AIM Startup Predictive Terminal") # Icon Removed
+
+# 7. MAIN INTERFACE (Dynamic Ticker)
+live_data = get_live_ticker_string()
+st.markdown(f"""
+    <div class="ticker-wrap">
+        <div class="ticker">LSE AIM LIVE: {live_data}</div>
+    </div>
+""", unsafe_allow_html=True)
 
 st.markdown("""
         <div class="flex-header">
