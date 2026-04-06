@@ -24,8 +24,14 @@ def render_login():
             st.rerun()
         return # Stop execution here to hide the forms
 
-    st.title("📟 AIM INSIGHTS TERMINAL")
-    
+    st.markdown("""
+        <div class="flex-header">
+            <i class="fa fa-lock"></i>
+            <h1>AIM INSIGHTS TERMINAL</h1>
+        </div>
+    """, unsafe_allow_html=True)
+
+
     # Toggle between Login and Registration
     tab1, tab2 = st.tabs(["🔑 Login", "📝 Create Account"])
 

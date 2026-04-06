@@ -38,9 +38,80 @@ def apply_modern_ui():
             [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p,
             [data-testid="stSidebar"] span, [data-testid="stSidebar"] label,
             [data-testid="stSidebar"] .stMarkdown { color: #f1f5f9 !important; }
+            
+            /* 1. Header with Icon (Flex Alignment) */
+            .flex-header {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                margin-bottom: 1.5rem;
+                padding-top: 1rem;
+            }
+            
+            .flex-header i {
+                font-size: 1.75rem;
+                /* color: #1e293b; */
+                color: #3b82f6;
+            }
+            
+            .flex-header h1 {
+                font-size: 1.75rem !important;
+                font-weight: 700 !important;
+                color: #1e293b !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                line-height: 1.2 !important;
+            }
+            
+            /* --- SUBHEADER WITH ICON --- */
+            .flex-subheader {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-top: 1.5rem;
+                margin-bottom: 1rem;
+                padding: 0;
+            }
+            
+            .flex-subheader i {
+                font-size: 1.5rem;
+                color: #3b82f6; /* Modern Blue accent for icons */
+            }
+            
+            .flex-subheader h3 {
+                font-size: 1.5rem !important;
+                font-weight: 600 !important;
+                color: #1e293b !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                line-height: 1.2 !important;
+                border-bottom: none !important; /* Removes default streamlit line if present */
+            }
+            
+            /* --- ALERT / NOTIFICATION CARDS --- */
+            .alert-card {
+                background-color: #FF2727;
+                color: #fff !important;
+                padding: 15px;
+                border-radius: 10px;
+                font-weight: 600;
+                text-align: center;
+                margin-bottom: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 12px;
+            }
+            
+            .alert-card i {
+                font-size: 1.2rem;
+                color: #980000;
+            }
+
 
             /* CUSTOM EMAIL BOX (Left Bar) */
             .user-data-box {
+                position: relative;
                 background-color: #193455;
                 color: rgba(255, 255, 255, 0.75);
                 font-size: 16px;
@@ -72,6 +143,43 @@ def apply_modern_ui():
             .user-data-box.last-of-type {
                 margin-bottom: 20px;
             }
+            
+            .user-data-box i {
+                position: absolute;
+                top: 10px;
+                left: 15px;
+                font-size: 20px;
+                z-index: 10001;
+            }
+            
+            .user-data-box-icon-panel {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 41px;
+                height: 41px;
+                background-color: #123FA1;
+                border-top-left-radius: 25px;
+                border-bottom-left-radius: 25px;
+                z-index: 10000;
+            }
+            
+            /* KILL THE EMAIL UNDERLINE */
+            .user-data-box, 
+            .user-data-box * {
+                text-decoration: none !important;
+                border-bottom: none !important;
+            }
+            
+            /* Specific Streamlit markdown override */
+            [data-testid="stMarkdownContainer"] p {
+                text-decoration: none !important;
+            }
+            
+            .user-data-box:hover {
+                text-decoration: none !important;
+            }
+
 
             /* MODERN TICKER WRAP */
             .ticker-wrap { 
@@ -112,16 +220,89 @@ def apply_modern_ui():
             }
 
             /* HIDE DEFAULT DECORATORS */
-            #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+            #MainMenu {
+                visibility: hidden;
+            } 
+            footer {
+                visibility: hidden;
+            } 
+            header {
+                visibility: hidden;
+            }
 
             /* MODERN BUTTONS */
             .stButton>button { 
-                background-color: #3b82f6 !important; color: white !important; 
-                border-radius: 8px !important; font-weight: 600; width: 100%; border: none; 
-                padding: 0.5rem; transition: all 0.3s ease;
+                background-color: #3b82f6 !important; 
+                color: white !important; 
+                border-radius: 8px !important; 
+                font-weight: 600; 
+                width: 100%; 
+                border: none; 
+                padding: 0.5rem; 
+                transition: all 0.3s ease;
             }
-            .stButton>button:hover { background-color: #2563eb !important; transform: translateY(-1px); }
+            .stButton>button:hover { 
+                background-color: #2563eb !important; 
+                transform: translateY(-1px); 
+            }
+            
+            /* Special Styling for the Admin/User Toggle Button */
+            .st-key-admin-toggle-btn button {
+                background-color: #A91712 !important;
+                color: white !important; 
+                border-radius: 8px !important; 
+                font-weight: 600; 
+                width: 100%; 
+                border: none; 
+                padding: 0.5rem; 
+                transition: all 0.3s ease;
+            }
+            .st-key-admin-toggle-btn button {
+                background-color: #A91712 !important;
+            }
+
+            
+            /* Styling the Toggle 'Off' State */
+            /* div[data-testid="stCheckbox"] > label > div[role="switch"] > div:first-child {
+                background-color: #475569 !important; /* Visible grey for 'Off' state */
+            } */
+            
+            /* Optional: Styling the Toggle 'On' State (Blue) */
+            /* div[data-testid="stCheckbox"] > label > div[role="switch"][aria-checked="true"] > div:first-child {
+                background-color: #3b82f6 !important; 
+            } */
+            
+            /* Ensure the toggle label is also clearly visible */
+            /* [data-testid="stWidgetLabel"] p {
+                color: #f1f5f9 !important;
+            } */
+            
+            /* [data-baseweb="checkbox"] [data-testid="stWidgetLabel"] p {
+                /* Styles for the label text for checkbox and toggle */
+            } */
+            
+            [data-baseweb="checkbox"] div {
+                /* Styles for the slider container */
+                background-color: #475569 !important;
+                border-radius:5px;
+            }
+            /* [data-baseweb="checkbox"] div div {
+                /* Styles for the slider circle */
+                background-color: #ffffff !important;
+            } */
+            /* [data-testid="stCheckbox"] label span {
+                /* Styles the checkbox */
+            } */
+            
+            /* 1. IMPORT FONT AWESOME 4 */
+            @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css');
+            
+
         </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     """, unsafe_allow_html=True)
 
 apply_modern_ui()
@@ -140,8 +321,8 @@ if st.query_params.get("payment") == "success":
 st.sidebar.title("AIM Terminal") # Icon Removed
 
 # Custom Email Box
-st.sidebar.markdown(f'<div class="user-data-box">{st.session_state.email}</div>', unsafe_allow_html=True)
-st.sidebar.markdown(f'<div class="user-data-box last-of-type">TIER: {st.session_state.subscription_tier.upper()}</div>', unsafe_allow_html=True)
+st.sidebar.markdown(f'<div class="user-data-box"><div class="user-data-box-icon-panel"></div><i class="fa fa-user"></i> {st.session_state.email}</div>', unsafe_allow_html=True)
+st.sidebar.markdown(f'<div class="user-data-box last-of-type"><div class="user-data-box-icon-panel"></div><i class="fa fa-diamond" style="left:10px;"></i> {st.session_state.subscription_tier.upper()}</div>', unsafe_allow_html=True)
 
 if st.sidebar.button("LOGOUT"):
     for key in list(st.session_state.keys()):
@@ -149,16 +330,47 @@ if st.sidebar.button("LOGOUT"):
     st.rerun()
 
 # 6. ADMIN ROUTING
+# if st.session_state.get('is_admin'):
+#     st.sidebar.markdown("---")
+#     show_admin = st.sidebar.toggle(" ADMIN PANEL", value=False)
+#     if show_admin:
+#         render_admin_dashboard()
+#         st.stop()
+
+# 6. ADMIN ROUTING (Button Toggle Logic)
 if st.session_state.get('is_admin'):
-    st.sidebar.markdown("---")
-    show_admin = st.sidebar.toggle("🛠️ ADMIN PANEL", value=False)
-    if show_admin:
+    # st.sidebar.markdown("---")
+    
+    # Initialize the admin_mode state if it doesn't exist
+    if 'admin_mode' not in st.session_state:
+        st.session_state.admin_mode = False
+
+    # Determine button label based on current state
+    btn_label = "VIEW USER DASHBOARD" if st.session_state.admin_mode else "OPEN ADMIN PANEL"
+    
+    # Render the button inside a container for the custom CSS
+    # st.sidebar.markdown('<div class="admin-toggle-btn">', unsafe_allow_html=True)
+    if st.sidebar.button(btn_label, key='admin-toggle-btn'):
+        st.session_state.admin_mode = not st.session_state.admin_mode
+        st.rerun()
+    # st.sidebar.markdown('</div>', unsafe_allow_html=True)
+
+    # Route to Admin Dashboard if mode is ON
+    if st.session_state.admin_mode:
         render_admin_dashboard()
         st.stop()
 
+
 # 7. MAIN INTERFACE
 st.markdown('<div class="ticker-wrap"><div class="ticker">LSE AIM LIVE: GGP.L 7.42 +1.2% | JET2.L 1,420.0 -0.5% | Volex 312.0 +2.1% | Helium One 1.15 +4.5%</div></div>', unsafe_allow_html=True)
-st.title("AIM Startup Predictive Terminal") # Icon Removed
+# st.title("AIM Startup Predictive Terminal") # Icon Removed
+
+st.markdown("""
+        <div class="flex-header">
+            <i class="fa fa-desktop"></i>
+            <h1>AIM Predictive Terminal</h1>
+        </div>
+    """, unsafe_allow_html=True)
 
 ticker = st.text_input("ENTER AIM TICKER (e.g. JET2)", "GGP").upper()
 
@@ -181,7 +393,7 @@ try:
     if db_data:
         # Volume Spike Alert
         if db_data['volume'] > 1000000:
-             st.markdown(f'<div style="background-color:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; padding:15px; border-radius:10px; font-weight:600; text-align:center; margin-bottom:20px;">🚨 UNUSUAL VOLUME DETECTED: {db_data["volume"]:,} SHARES</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="alert-card"><i class="fa fa-warning"></i> Unusual volume detected: {db_data["volume"]:,} shares</div>', unsafe_allow_html=True)
 
         raw_price = db_data['close_price']
         display_price = raw_price / 100 if raw_price > 5 else raw_price
@@ -198,7 +410,15 @@ try:
     st.markdown("---")
 
     # B. CLAUDE 4.6 SENTIMENT FEED
-    st.subheader(f"🤖 CLAUDE 4.6 SENTIMENT FEED: {ticker}")
+    # st.subheader(f"CLAUDE 4.6 SENTIMENT FEED: {ticker}")
+    
+    st.markdown("""
+        <div class="flex-subheader">
+            <i class="fa fa-android"></i>
+            <h3>Claude 4.6 Sentiment Feed</h3>
+        </div>
+    """, unsafe_allow_html=True)
+
     if db_data:
         cursor.execute("""
             SELECT timestamp, headline, sentiment_score 
@@ -229,10 +449,18 @@ except Exception as e:
 st.markdown("---")
 
 # 7. PRO FEATURE GATES
-st.subheader("🛡️ ADVANCED ANALYTICS")
+# st.subheader("ADVANCED ANALYTICS")
+
+st.markdown("""
+    <div class="flex-subheader">
+        <i class="fa fa-shield"></i>
+        <h3>Advanced Analytics</h3>
+    </div>
+""", unsafe_allow_html=True)
+
 
 if st.session_state.subscription_tier == 'pro':
-    t1, t2 = st.tabs(["🤖 ON-DEMAND", "📜 REPORTS"])
+    t1, t2 = st.tabs(["ON-DEMAND", "REPORTS"])
     with t1:
         rns_text = st.text_area("Paste RNS Content...")
         if st.button("RUN AI SCORING"):
@@ -240,7 +468,7 @@ if st.session_state.subscription_tier == 'pro':
                 sentiment = get_sentiment(rns_text)
                 st.code(sentiment, language="markdown")
 else:
-    st.warning("🔒 PREMIUM CONTENT LOCKED")
+    st.warning("PREMIUM CONTENT LOCKED")
     if st.button("ACTIVATE PRO TIER"):
         checkout_url = create_checkout_session(st.session_state.email, st.session_state.user_id)
         st.markdown(f'<meta http-equiv="refresh" content="0; url={checkout_url}">', unsafe_allow_html=True)
