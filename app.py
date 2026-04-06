@@ -304,6 +304,26 @@ def apply_modern_ui():
                 /* Styles the checkbox */
             } */
             
+            /* --- CIRCULAR LOGO STYLING --- */
+            .logo-container {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: 100%;
+                margin-bottom: 15px;
+                padding-top: 10px;
+            }
+            
+            .logo-circular {
+                width: 50px;
+                height: 50px;
+                border-radius: 50%; /* Makes it a circle */
+                object-fit: cover;
+                border: 2px solid rgba(255, 255, 255, 0.2); /* Subtle light border */
+                background-color: white; /* Ensures no transparency issues */
+            }
+
+            
             /* 1. IMPORT FONT AWESOME 4 */
             @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css');
             
@@ -316,29 +336,40 @@ def apply_modern_ui():
     """, unsafe_allow_html=True)
     
 def get_live_ticker_string():
-    """Fetches the latest prices for all tracked companies to build the marquee."""
+    """Generates the dynamic marquee string by fetching the most recent price for each ticker."""
     try:
         conn = get_db_connection()
+        # This query gets the LATEST price entry for each company, regardless of today's date
         query = """
-            SELECT c.ticker, p.close_price, p.day_return 
+            SELECT c.ticker, p.close_price, p.day_return,
+            (SELECT sentiment_score FROM rns_announcements WHERE company_id = c.company_id ORDER BY timestamp DESC LIMIT 1) as sent
             FROM companies c
             JOIN daily_prices p ON c.company_id = p.company_id
-            WHERE p.trade_date = (SELECT MAX(trade_date) FROM daily_prices)
+            WHERE p.trade_date = (
+                SELECT MAX(trade_date) 
+                FROM daily_prices dp 
+                WHERE dp.company_id = c.company_id
+            )
         """
         df = pd.read_sql(query, conn)
         conn.close()
 
-        # Build the string: TICKER PRICE (RETURN%)
+        if df.empty:
+            return "INITIALIZING MARKET DATA..."
+
         ticker_items = []
         for _, row in df.iterrows():
-            arrow = "▲" if row['day_return'] >= 0 else "▼"
-            color = "#00FF41" if row['day_return'] >= 0 else "#FF4B4B"
-            item = f"{row['ticker']}.L {row['close_price']:.2f} {arrow} {row['day_return']:.1f}%"
+            # Handle potential None values for sentiment
+            sentiment = f"{row['sent']:.2f}" if row['sent'] is not None else "N/A"
+            # Format: TICKER PRICE (SENTIMENT)
+            item = f"{row['ticker']}.L {row['close_price']:.2f} (AI: {sentiment})"
             ticker_items.append(item)
         
         return " | ".join(ticker_items)
-    except:
-        return "DATA TEMPORARILY UNAVAILABLE"
+    except Exception as e:
+        print(f"Ticker Error: {e}")
+        return "SYNCING WITH TERMINAL..."
+
 
 
 apply_modern_ui()
@@ -354,6 +385,13 @@ if st.query_params.get("payment") == "success":
     st.success("Subscription Active: Pro Features Unlocked.")
 
 # 5. SIDEBAR & NAVIGATION
+
+st.sidebar.markdown("""
+    <div class="logo-container">
+        <img src="static/assets/images/png/logo/logo-597x597.png" class="logo-circular">
+    </div>
+""", unsafe_allow_html=True)
+
 st.sidebar.title("AIM Terminal") # Icon Removed
 
 # Custom Email Box

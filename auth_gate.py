@@ -5,6 +5,12 @@ from db_utils import get_db_connection
 from datetime import datetime
 
 def render_login():
+    # 1. THE LOGO (Always at the very top of the page)
+    st.markdown("""
+        <div class="logo-container">
+            <img src="app/static/assets/images/png/logo/logo-597x597.png" class="logo-circular" style="width: 80px; height: 80px;">
+        </div>
+    """, unsafe_allow_html=True)
     # --- NEW: POST-REGISTRATION WELCOME STATE ---
     if st.session_state.get('reg_success'):
         st.balloons()
