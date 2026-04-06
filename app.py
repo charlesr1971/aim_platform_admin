@@ -1,149 +1,150 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-from auth_gate import render_login
-from admin import render_admin_dashboard
-from stripe_handler import create_checkout_session
-from data_engine import fetch_aim_price, get_sentiment
 from db_utils import get_db_connection
-from datetime import datetime
+from stripe_handler import create_checkout_session
+import os
+from dotenv import load_dotenv
+from pathlib import Path
 
-# 1. GLOBAL CONFIG & THEME INJECTION
-st.set_page_config(page_title="AIM Insights | Terminal", layout="wide")
+# 1. SECURE ENVIRONMENT LOAD
+env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
+load_dotenv(dotenv_path=env_path)
 
-def apply_custom_styles():
+# 2. PAGE CONFIG (Must be first)
+st.set_page_config(
+    page_title="AIM Platform Admin",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# 3. MODERN UI CSS INJECTION (The "ECharts" Look)
+def apply_modern_ui():
     st.markdown("""
         <style>
-            .stApp { background-color: #050505; color: #00FF41; font-family: 'Courier New', monospace; }
-            [data-testid="stSidebar"] { background-color: #111111; border-right: 1px solid #333; }
-            label, .stWidgetLabel p { color: #FFFFFF !important; font-weight: bold !important; font-size: 1.1rem !important; }
-            .stTextInput>div>div>input { background-color: #1a1a1a !important; color: #00FF41 !important; border: 1px solid #00FF41 !important; }
-            .stButton>button { background-color: #ff9900 !important; color: #000 !important; border-radius: 0px !important; font-weight: bold; width: 100%; border: none; }
-            [data-testid="stMetricValue"] { color: #00FF41 !important; font-size: 2rem; }
-            .ticker-wrap { width: 100%; overflow: hidden; background: #222; color: #ff9900; padding: 10px 0; border-bottom: 1px solid #444; margin-bottom: 20px; }
-            .ticker { display: inline-block; white-space: nowrap; animation: marquee 60s linear infinite; font-weight: bold; }
-            @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-            #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-            .news-card { border-left: 5px solid #ff9900; background-color: #111; padding: 15px; margin-bottom: 10px; border-radius: 0 5px 5px 0; }
+            /* Main App Background */
+            .stApp {
+                background-color: #f8fafc;
+            }
+            
+            /* High-End Card Styling for Metrics */
+            div[data-testid="stMetric"] {
+                background-color: #ffffff;
+                border: 1px solid #e2e8f0;
+                padding: 1.5rem;
+                border-radius: 12px;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            }
+
+            /* Sidebar Border for Clean Separation */
+            section[data-testid="stSidebar"] {
+                border-right: 1px solid #334155;
+            }
+
+            /* Modern Blue Buttons */
+            .stButton > button {
+                width: 100%;
+                border-radius: 8px;
+                background-color: #3b82f6;
+                color: white;
+                border: none;
+                padding: 0.6rem;
+                font-weight: 600;
+                transition: all 0.3s ease;
+            }
+            .stButton > button:hover {
+                background-color: #2563eb;
+                border: none;
+                color: white;
+                transform: translateY(-1px);
+            }
+
+            /* Clean Typography */
+            h1, h2, h3 {
+                color: #0f172a;
+                font-family: 'Inter', sans-serif;
+                font-weight: 700 !important;
+            }
+
+            /* Table/Dataframe Styling */
+            .stDataFrame {
+                background-color: #ffffff;
+                border-radius: 12px;
+                padding: 10px;
+                border: 1px solid #e2e8f0;
+            }
         </style>
     """, unsafe_allow_html=True)
 
-apply_custom_styles()
+apply_modern_ui()
 
-# 2. AUTHENTICATION & SESSION MANAGEMENT
-if 'logged_in' not in st.session_state:
-    render_login()
-    st.stop()
-
-# 3. SUCCESS REDIRECT HANDLER
-if st.query_params.get("payment") == "success":
-    st.balloons()
-    st.success("Subscription Active: Pro Features Unlocked.")
-
-# 4. SIDEBAR & NAVIGATION
-st.sidebar.title(f"📟 {st.session_state.email}")
-st.sidebar.markdown(f"**TIER:** {st.session_state.subscription_tier.upper()}")
-
-if st.sidebar.button("LOGOUT"):
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-    st.rerun()
-
-# 5. ADMIN ROUTING
-if st.session_state.get('is_admin'):
-    show_admin = st.sidebar.toggle("ADMIN PANEL", value=False)
-    if show_admin:
-        render_admin_dashboard()
-        st.stop()
-
-# 6. MAIN INTERFACE
-st.markdown('<div class="ticker-wrap"><div class="ticker">LSE AIM LIVE: GGP.L 7.42 +1.2% | JET2.L 1,420.0 -0.5% | Volex 312.0 +2.1% | Helium One 1.15 +4.5%</div></div>', unsafe_allow_html=True)
-st.title("📈 AIM Startup Predictive Terminal")
-
-ticker = st.text_input("ENTER AIM TICKER (e.g. JET2)", "GGP").upper()
-
-col1, col2, col3 = st.columns(3)
-
-# --- DATABASE DATA FETCH ---
-try:
+def get_market_data():
+    """Fetches latest prices and sentiment for the dashboard."""
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True, buffered=True)
-
-    cursor.execute("""
-        SELECT p.*, c.company_id 
-        FROM daily_prices p 
-        JOIN companies c ON p.company_id = c.company_id 
-        WHERE c.ticker = %s 
-        ORDER BY p.trade_date DESC LIMIT 1
-    """, (ticker,))
-    db_data = cursor.fetchone()
-
-    if db_data:
-        # Volume Spike Alert
-        if db_data['volume'] > 1000000:
-             st.markdown(f'<div style="background-color:#ff9900; color:black; padding:10px; font-weight:bold; text-align:center; margin-bottom:20px;">🚨 UNUSUAL VOLUME DETECTED: {db_data["volume"]:,} SHARES</div>', unsafe_allow_html=True)
-
-        # Fix Pence to Pounds conversion
-        raw_price = db_data['close_price']
-        display_price = raw_price / 100 if raw_price > 5 else raw_price
-        
-        col1.metric(f"{ticker} PRICE", f"£{display_price:.4f}")
-        col2.metric("DAILY VOLUME", f"{db_data['volume']:,}")
-        col3.metric("STAGE", "GROWTH")
-    else:
-        price = fetch_aim_price(ticker)
-        col1.metric(f"{ticker} PRICE", f"£{price:.2f}")
-        col2.metric("DAILY VOLUME", "N/A")
-        col3.metric("STAGE", "N/A")
-
-    st.markdown("---")
-
-    # B. CLAUDE 4.6 SENTIMENT FEED
-    st.subheader(f"🤖 CLAUDE 4.6 SENTIMENT FEED: {ticker}")
-    if db_data:
-        cursor.execute("""
-            SELECT timestamp, headline, sentiment_score 
-            FROM rns_announcements 
-            WHERE company_id = %s 
-            ORDER BY timestamp DESC LIMIT 5
-        """, (db_data['company_id'],))
-        news_items = cursor.fetchall()
-
-        if news_items:
-            for news in news_items:
-                score = news['sentiment_score']
-                color = "#00FF41" if score > 0.3 else "#FF4B4B" if score < -0.2 else "#FF9900"
-                st.markdown(f"""
-                    <div class="news-card" style="border-left-color: {color};">
-                        <small style="color:#888;">{news['timestamp'].strftime('%d %b %H:%M')}</small><br>
-                        <b style="color:white;">{news['headline']}</b><br>
-                        <span style="color:{color}; font-weight:bold;">AI SENTIMENT: {score}</span>
-                    </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("No recent AI-scored news found for this ticker.")
+    if not conn:
+        return pd.DataFrame()
     
+    query = """
+        SELECT c.ticker, p.close_price, p.volume, p.trade_date,
+               (SELECT sentiment_score FROM rns_announcements 
+                WHERE company_id = c.company_id ORDER BY timestamp DESC LIMIT 1) as last_sentiment
+        FROM companies c
+        JOIN daily_prices p ON c.company_id = p.company_id
+        WHERE p.trade_date = (SELECT MAX(trade_date) FROM daily_prices)
+    """
+    df = pd.read_sql(query, conn)
     conn.close()
-except Exception as e:
-    st.error(f"System Error: {e}")
+    return df
 
-st.markdown("---")
+def main():
+    # --- SIDEBAR NAV ---
+    st.sidebar.title("AIM Terminal")
+    st.sidebar.markdown("---")
+    
+    # Mock user for now (Integration with login coming next)
+    user_id = 1 
+    
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT email, subscription_tier FROM users WHERE user_id = %s", (user_id,))
+        user = cursor.fetchone()
+        
+        if user:
+            st.sidebar.write(f"👤 **{user['email']}**")
+            st.sidebar.write(f"Status: `{user['subscription_tier'].upper()}`")
+            
+            if user['subscription_tier'] == 'free':
+                st.sidebar.warning("Upgrade to PRO for real-time AI Sentiment")
+                if st.sidebar.button("🚀 Unlock PRO Tier"):
+                    checkout_url = create_checkout_session(user['email'], user_id)
+                    if checkout_url:
+                        st.sidebar.markdown(f"[Click here to pay]({checkout_url})")
+        
+        cursor.close()
+        conn.close()
 
-# 7. PRO FEATURE GATES
-st.subheader("🛡️ ADVANCED ANALYTICS")
+    # --- MAIN CONTENT ---
+    st.title("Market Overview")
+    
+    df = get_market_data()
+    
+    if not df.empty:
+        # Row 1: Key Metrics
+        cols = st.columns(len(df))
+        for i, row in df.iterrows():
+            with cols[i]:
+                st.metric(
+                    label=f"{row['ticker']}.L", 
+                    value=f"{row['close_price']}p", 
+                    delta=f"Vol: {row['volume']:,}"
+                )
+        
+        st.markdown("---")
+        st.subheader("Deep Dive Analysis")
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("No market data found. Please run the Data Ingest script.")
 
-if st.session_state.subscription_tier == 'pro':
-    t1, t2 = st.tabs(["🤖 ON-DEMAND", "📜 REPORTS"])
-    with t1:
-        rns_text = st.text_area("Paste RNS Content...")
-        if st.button("RUN AI SCORING"):
-            with st.spinner("Claude 4.6 analyzing..."):
-                sentiment = get_sentiment(rns_text)
-                st.code(sentiment, language="markdown")
-else:
-    st.warning("🔒 PREMIUM CONTENT LOCKED")
-    if st.button("ACTIVATE PRO TIER"):
-        checkout_url = create_checkout_session(st.session_state.email, st.session_state.user_id)
-        st.markdown(f'<meta http-equiv="refresh" content="0; url={checkout_url}">', unsafe_allow_html=True)
-
-st.sidebar.caption("System Health: Online | Claude 4.6 Active")
+if __name__ == "__main__":
+    main()
