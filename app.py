@@ -1,4 +1,5 @@
-import streamlit as st
+import stripe
+import os
 import pandas as pd
 import plotly.express as px
 from auth_gate import render_login
@@ -7,9 +8,9 @@ from stripe_handler import create_checkout_session
 from data_engine import fetch_aim_price, get_sentiment
 from db_utils import get_db_connection
 from datetime import datetime
-import os
 from dotenv import load_dotenv
 from pathlib import Path
+import streamlit as st
 
 # 1. SECURE ENVIRONMENT LOAD
 env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
@@ -25,10 +26,10 @@ def apply_modern_ui():
             @import url('https://googleapis.com');
             html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-            /* Main Background (Light/Professional) */
+            /* Main App Background (Light/Professional) */
             .stApp { background-color: #f8fafc; color: #1e293b; }
 
-            /* SLATE DARK SIDEBAR (The ECharts Look) */
+            /* SLATE DARK SIDEBAR */
             [data-testid="stSidebar"] { 
                 background-color: #1e293b !important; 
                 border-right: 1px solid #334155; 
@@ -38,7 +39,21 @@ def apply_modern_ui():
             [data-testid="stSidebar"] span, [data-testid="stSidebar"] label,
             [data-testid="stSidebar"] .stMarkdown { color: #f1f5f9 !important; }
 
-            /* MODERN TICKER WRAP (Updated for Light UI) */
+            /* CUSTOM EMAIL BOX (Left Bar) */
+            .user-email-box {
+                background-color: #11467D;
+                color: rgba(255, 255, 255, 0.75);
+                font-size: 14px;
+                padding: 14px;
+                border-radius: 8px;
+                text-decoration: none !important;
+                margin-bottom: 10px;
+                display: block;
+                text-align: center;
+                font-weight: 500;
+            }
+
+            /* MODERN TICKER WRAP */
             .ticker-wrap { 
                 width: 100%; overflow: hidden; background: #334155; color: #00FF41; 
                 padding: 12px 0; border-bottom: 2px solid #3b82f6; margin-bottom: 20px; 
@@ -46,7 +61,7 @@ def apply_modern_ui():
             .ticker { display: inline-block; white-space: nowrap; animation: marquee 60s linear infinite; font-weight: 700; font-family: monospace; }
             @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
 
-            /* WHITE DATA CARDS (Replaces Metric Text) */
+            /* WHITE DATA CARDS */
             div[data-testid="stMetric"] {
                 background-color: #ffffff;
                 border: 1px solid #e2e8f0;
@@ -91,7 +106,10 @@ if st.query_params.get("payment") == "success":
     st.success("Subscription Active: Pro Features Unlocked.")
 
 # 5. SIDEBAR & NAVIGATION
-st.sidebar.title(f"📟 {st.session_state.email}")
+st.sidebar.title("AIM Terminal") # Icon Removed
+
+# Custom Email Box
+st.sidebar.markdown(f'<div class="user-email-box">{st.session_state.email}</div>', unsafe_allow_html=True)
 st.sidebar.markdown(f"**TIER:** `{st.session_state.subscription_tier.upper()}`")
 
 if st.sidebar.button("LOGOUT"):
@@ -109,7 +127,7 @@ if st.session_state.get('is_admin'):
 
 # 7. MAIN INTERFACE
 st.markdown('<div class="ticker-wrap"><div class="ticker">LSE AIM LIVE: GGP.L 7.42 +1.2% | JET2.L 1,420.0 -0.5% | Volex 312.0 +2.1% | Helium One 1.15 +4.5%</div></div>', unsafe_allow_html=True)
-st.title("📈 AIM Startup Predictive Terminal")
+st.title("AIM Startup Predictive Terminal") # Icon Removed
 
 ticker = st.text_input("ENTER AIM TICKER (e.g. JET2)", "GGP").upper()
 
@@ -130,7 +148,7 @@ try:
     db_data = cursor.fetchone()
 
     if db_data:
-        # Volume Spike Alert (Updated for Modern UI)
+        # Volume Spike Alert
         if db_data['volume'] > 1000000:
              st.markdown(f'<div style="background-color:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; padding:15px; border-radius:10px; font-weight:600; text-align:center; margin-bottom:20px;">🚨 UNUSUAL VOLUME DETECTED: {db_data["volume"]:,} SHARES</div>', unsafe_allow_html=True)
 
@@ -194,7 +212,6 @@ else:
     st.warning("🔒 PREMIUM CONTENT LOCKED")
     if st.button("ACTIVATE PRO TIER"):
         checkout_url = create_checkout_session(st.session_state.email, st.session_state.user_id)
-        # Using markdown redirect for reliability on Windows 2019
         st.markdown(f'<meta http-equiv="refresh" content="0; url={checkout_url}">', unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
