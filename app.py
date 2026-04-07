@@ -11,6 +11,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 from pathlib import Path
 import streamlit as st
+from fpdf import FPDF
+import io
 
 # 1. SECURE ENVIRONMENT LOAD
 env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
@@ -324,7 +326,40 @@ def apply_modern_ui():
                 margin: 0 auto !important; 
                 display: block !important;
             }
+            
+            /* --- TARGETING CLAUDE'S CODE BLOCK OUTPUT --- */
 
+            /* 1. Change the background and text of the whole code box to be cleaner */
+            [data-testid="stCode"] {
+                background-color: #ffffff !important;
+                border: 1px solid #e2e8f0 !important;
+                border-radius: 8px !important;
+            }
+            
+            /* 2. Target the '## Sentiment Analysis' (h2 equivalent) */
+            [data-testid="stCode"] .token.title.important {
+                color: #1e293b !important;
+                font-weight: 700 !important;
+                font-size: 1.2rem !important;
+            }
+            
+            /* 3. Target the '###' (h3 equivalent) */
+            [data-testid="stCode"] .token.punctuation + .token.title {
+                color: #3b82f6 !important;
+            }
+            
+            /* 4. Target the Bold text (Overall Sentiment / Score) */
+            [data-testid="stCode"] .token.bold {
+                color: #0f172a !important;
+                background-color: #f1f5f9 !important;
+                padding: 0px 4px;
+                border-radius: 4px;
+            }
+            
+            /* 5. Force the base text colour to be Slate instead of the default grey */
+            [data-testid="stCode"] code {
+                color: #475569 !important;
+            }
 
 
             
@@ -338,6 +373,99 @@ def apply_modern_ui():
     st.markdown("""
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     """, unsafe_allow_html=True)
+
+
+def generate_7day_report(ticker):
+    """Generates a 7-day branded sentiment report."""
+    try:
+        conn = get_db_connection()
+        
+        # FIXED: Cleaner syntax for MySQL 5.5 compatibility
+        query = """
+            SELECT ra.timestamp, ra.headline, ra.sentiment_score 
+            FROM rns_announcements ra
+            INNER JOIN companies c ON ra.company_id = c.company_id
+            WHERE c.ticker = %s 
+            AND ra.timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            ORDER BY ra.timestamp DESC
+        """
+        
+        # Ensure the parameter is passed as a tuple (ticker,)
+        df = pd.read_sql(query, conn, params=(ticker,))
+        conn.close()
+
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # 1. ADD BRAND LOGO (Top Left)
+        logo_path = r"C:\inetpub\wwwroot\aim_platform_admin\static\assets\images\png\logo\logo-597x597.png"
+        if os.path.exists(logo_path):
+            pdf.image(logo_path, 10, 8, 20) # Logo is 20mm wide
+        
+        # 2. HEADER (Nudged right to avoid overlap)
+        pdf.set_font("Arial", 'B', 18)
+        pdf.set_text_color(30, 41, 59) 
+        pdf.set_x(35) # Start text after the logo
+        pdf.cell(0, 10, f"AIM Terminal: {ticker}.L Report", ln=True, align='L')
+        
+        # Sub-info line (Also nudged right)
+        pdf.set_x(35)
+        pdf.set_font("Arial", '', 10)
+        pdf.set_text_color(100, 116, 139)
+        pdf.cell(0, 10, f"Period: Last 7 Days | Generated: {datetime.now().strftime('%d %b %Y')}", ln=True, align='L')
+        pdf.ln(10)
+        
+        # 3. BLUE SEPARATOR LINE (Full width)
+        pdf.set_draw_color(59, 130, 246)
+        pdf.line(10, 35, 200, 35)
+        pdf.ln(5)
+
+        if df.empty:
+            pdf.set_font("Arial", 'I', 12)
+            pdf.cell(0, 10, "No RNS announcements found in the last 7 days.", ln=True)
+        else:
+            for _, row in df.iterrows():
+                # --- CLEAN THE TEXT FOR LATIN-1 COMPATIBILITY ---
+                headline = row['headline']
+                # Replaces curly quotes, long dashes, and other non-latin characters
+                headline = headline.replace('\u2019', "'").replace('\u2018', "'").replace('\u2014', "-")
+                headline = headline.encode('latin-1', 'replace').decode('latin-1')
+                headline = headline.replace('?', "'") # 'replace' often turns smart quotes into ?
+                
+                # Headline
+                pdf.set_font("Arial", 'B', 11)
+                pdf.set_text_color(30, 41, 59)
+                pdf.multi_cell(0, 7, f"[{row['timestamp'].strftime('%d %b')}] {headline}")
+                
+                # Sentiment Score
+                pdf.set_font("Arial", 'B', 10)
+                score = row['sentiment_score']
+                
+                # Color coding the sentiment text
+                if score > 0.3:
+                    pdf.set_text_color(16, 185, 129) # Green
+                    status = "BULLISH"
+                elif score < -0.2:
+                    pdf.set_text_color(239, 68, 68) # Red
+                    status = "BEARISH"
+                else:
+                    pdf.set_text_color(245, 158, 11) # Amber
+                    status = "NEUTRAL"
+                    
+                pdf.cell(0, 7, f"AI SENTIMENT SCORE: {score} ({status})", ln=True)
+                pdf.ln(4)
+                
+                # Subtle grey divider
+                pdf.set_draw_color(226, 232, 240)
+                pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+                pdf.ln(4)
+
+        # Output to bytes
+        return pdf.output(dest='S').encode('latin-1')
+    except Exception as e:
+        st.error(f"Error building PDF: {e}")
+        return None
+
     
 def get_live_ticker_string():
     """Generates the dynamic marquee string by fetching the most recent price for each ticker."""
@@ -554,6 +682,25 @@ if st.session_state.subscription_tier == 'pro':
             with st.spinner("Claude 4.6 analyzing..."):
                 sentiment = get_sentiment(rns_text)
                 st.code(sentiment, language="markdown")
+    with t2:
+        st.markdown('<div class="flex-subheader"><i class="fa fa-file-pdf-o"></i><h3>7-Day Sentiment Summary</h3></div>', unsafe_allow_html=True)
+        
+        # User selects the ticker
+        report_ticker = st.selectbox("Select Company", ["GGP", "JET2", "VLX", "HE1", "HVO", "KOD"])
+        
+        if st.button(f"Compile {report_ticker} Data"):
+            with st.spinner(f"Generating PDF for {report_ticker}..."):
+                pdf_output = generate_7day_report(report_ticker)
+                
+                if pdf_output:
+                    st.success("Report Compiled Successfully")
+                    st.download_button(
+                        label="📥 Download PDF Report",
+                        data=pdf_output,
+                        file_name=f"AIM_Report_{report_ticker}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                        mime="application/pdf"
+                    )
+
 else:
     st.warning("PREMIUM CONTENT LOCKED")
     if st.button("ACTIVATE PRO TIER"):
