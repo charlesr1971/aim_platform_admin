@@ -70,12 +70,12 @@ def handle_webhook_payload(payload, sig_header):
                 conn = get_db_connection()
                 cur = conn.cursor(buffered=True)
                 
-                # Update user with Tier and both Stripe IDs
+                # Update user with Tier and both Stripe IDs (using COALESCE safety fix)
                 sql = """
                     UPDATE users 
                     SET subscription_tier = 'pro', 
-                        stripe_customer_id = %s, 
-                        stripe_subscription_id = %s 
+                        stripe_customer_id = COALESCE(%s, stripe_customer_id), 
+                        stripe_subscription_id = COALESCE(%s, stripe_subscription_id) 
                     WHERE user_id = %s
                 """
                 cur.execute(sql, (stripe_cust_id, stripe_sub_id, user_id))

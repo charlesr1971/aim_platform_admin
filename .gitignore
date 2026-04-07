@@ -11,3 +11,5 @@ aim_market.db
 # Local Backups
 backups/
 *.sql
+
+archive/
