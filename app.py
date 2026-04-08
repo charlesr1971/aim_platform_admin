@@ -521,8 +521,18 @@ def get_live_ticker_string():
         ticker_items = []
         for _, row in df.iterrows():
             # Handle potential None values for sentiment
-            sentiment = f"{row['sent']:.2f}" if row['sent'] is not None else "N/A"
-            # Format: TICKER PRICE (SENTIMENT)
+            val = row['sent']
+            # pd.isna() safely handles NaN, None, and even NaT (for dates)
+            if pd.isna(val):
+                clean_val = 0.0
+            else:
+                try:
+                    clean_val = float(val)
+                except (ValueError, TypeError):
+                    # Fallback if the data is a non-numeric string or other weirdness
+                    clean_val = 0.0
+                    
+            sentiment = f"{clean_val:.2f}"
             item = f"{row['ticker']}.L {row['close_price']:.2f} (AI: {sentiment})"
             ticker_items.append(item)
         
