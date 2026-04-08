@@ -28,6 +28,7 @@ def apply_modern_ui():
         <style>
             /* Force Modern Sans-Serif Font */
             @import url('https://googleapis.com');
+            
             html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
             /* Main App Background (Light/Professional) */
@@ -146,6 +147,14 @@ def apply_modern_ui():
                 text-align: center;
             }
             
+            .user-data-box.brand-colour-primary {
+                background-color: #5B89A3;
+            }
+            
+            .user-data-box.font-weight-default {
+                font-weight: 400;
+            }
+            
             .user-data-box a:link {
                 text-decoration: none !important;
             }
@@ -206,26 +215,26 @@ def apply_modern_ui():
             /* MODERN TICKER WRAP */
             .ticker-wrap { 
                 width: 100%; 
-                overflow: hidden; 
-                /* background: #334155; */
+                overflow: hidden;
                 background: #1e293b;
-                color: #00FF41; 
+                color: #7DF9FF;
                 padding: 12px 0;  
                 margin-bottom: 20px; 
             }
             .ticker { 
                 display: inline-block; 
                 white-space: nowrap; 
-                animation: marquee 45s linear infinite; 
-                font-weight: 700; 
-                /* font-family: monospace; */
-                font-family: 'Courier New', monospace; 
+                animation: marquee 135s linear infinite;
+                font-family: 'Doto', 'Courier New', Courier, monospace !important;
+                font-optical-sizing: auto;
+                font-weight: 400; /* Adjust weight from 100 to 900 */
+                font-style: normal;
             }
             
             
             @keyframes marquee { 
                 0% { 
-                    transform: translateX(100%);
+                    transform: translateX(10%);
                 } 
                 100% { 
                     transform: translateX(-100%); 
@@ -548,7 +557,7 @@ st.sidebar.markdown("""
 st.sidebar.title("") # Icon Removed
 
 # Custom Email Box
-st.sidebar.markdown(f'<div class="user-data-box"><span class="align-center"><strong>Welcome</strong> {display_name}</span></div>', unsafe_allow_html=True)
+st.sidebar.markdown(f'<div class="user-data-box brand-colour-primary font-weight-default"><span class="align-center"><strong>Welcome</strong> {display_name}</span></div>', unsafe_allow_html=True)
 st.sidebar.markdown(f'<div class="user-data-box"><div class="user-data-box-icon-panel"></div><i class="fa fa-user"></i><span class="align-left">{st.session_state.email}</span></div>', unsafe_allow_html=True)
 st.sidebar.markdown(f'<div class="user-data-box last-of-type"><div class="user-data-box-icon-panel"></div><i class="fa fa-diamond" style="left:10px;"></i><span class="align-left">{st.session_state.subscription_tier.upper()}</span></div>', unsafe_allow_html=True)
 
@@ -600,6 +609,9 @@ st.markdown(f"""
         <div class="ticker">LSE AIM LIVE: {live_data}</div>
     </div>
 """, unsafe_allow_html=True)
+
+# Create a single string containing the font link, the styles, and the HTML
+# ticker_data = f"LSE AIM LIVE: {live_data}"
 
 st.markdown("""
         <div class="flex-header">
