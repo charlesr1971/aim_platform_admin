@@ -1,6 +1,7 @@
 import yfinance as yf
 import anthropic
 import os
+import json
 import mysql.connector
 from db_utils import get_db_connection
 from datetime import datetime
@@ -11,7 +12,20 @@ from pathlib import Path
 env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
 load_dotenv(dotenv_path=env_path)
 
-AIM_STARTUPS = ["GGP", "JET2", "VLX", "HE1", "HVO", "KOD"]
+def get_active_tickers():
+    """Loads the latest discovered tickers from the JSON file."""
+    path = r"C:\inetpub\wwwroot\aim_platform_admin\active_tickers.json"
+    try:
+        with open(path, 'r') as f:
+            data = json.load(f)
+            tickers = data.get('tickers', [])
+            if tickers:
+                return tickers
+    except Exception as e:
+        print(f"⚠️ Could not load active_tickers.json: {e}")
+    
+    # Final safety fallback to your core 6
+    return ["GGP", "JET2", "VLX", "HE1", "HVO", "KOD"]
 
 def get_claude_sentiment(headline):
     """Scores RNS sentiment using Claude 4.6."""
@@ -32,72 +46,99 @@ def get_claude_sentiment(headline):
 
 def ingest_market_data():
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    print(f"--- 📟 Starting AIM Production Ingest: {now_str} ---")
+    print(f"--- 📟 Starting Dynamic AIM Ingest: {now_str} ---")
+    
+    # LOAD THE DYNAMIC TICKER LIST
+    active_tickers = get_active_tickers()
+    print(f"🎯 Target Tickers for this run: {active_tickers}")
     
     conn = get_db_connection()
     cursor = conn.cursor(buffered=True) 
 
-    for ticker in AIM_STARTUPS:
-        print(f"Processing {ticker}...")
+    for ticker_l in active_tickers:
+        # ticker_l will be "GGP.L"
+        # For the DB and logs, let's keep a clean version
+        ticker = ticker_l.replace('.L', '')
+        print(f"\nProcessing {ticker}...")
+        
         try:
-            stock = yf.Ticker(f"{ticker}.L")
+            stock = yf.Ticker(ticker_l)
             
-            # A. MARKET DATA
+            # A. MARKET DATA FETCH
             hist = stock.history(period='1d')
-            close_price = float(hist['Close'].iloc[0]) if not hist.empty else 0.0
-            volume = int(hist['Volume'].iloc[0]) if not hist.empty else 0
+            if hist.empty:
+                continue
+                
+            close_price = float(hist['Close'].iloc[0])
+            volume = int(hist['Volume'].iloc[0])
 
-            # B. GET COMPANY ID
-            cursor.execute("INSERT INTO companies (ticker, company_name) VALUES (%s, %s) ON DUPLICATE KEY UPDATE company_name=VALUES(company_name)", (ticker, ticker))
+            # --- NEW: Fetch Share Capital (Shares Outstanding) ---
+            # .info can be slow, so we use a try/except specifically for it
+            share_capital = 0
+            try:
+                print(f"  📊 Fetching share capital for {ticker}...")
+                share_capital = stock.info.get('sharesOutstanding', 0)
+            except:
+                pass
+
+            # B. AUTO-POPULATE COMPANY TABLE
+            # We add the enlarged_share_capital to the INSERT/UPDATE logic
+            cursor.execute("""
+                INSERT INTO companies (ticker, company_name, enlarged_share_capital) 
+                VALUES (%s, %s, %s) 
+                ON DUPLICATE KEY UPDATE 
+                    company_name=VALUES(company_name),
+                    enlarged_share_capital=VALUES(enlarged_share_capital)
+            """, (ticker, ticker, share_capital))
+
+            
             cursor.execute("SELECT company_id FROM companies WHERE ticker = %s", (ticker,))
             res = cursor.fetchone()
-            if res:
-                company_id = res[0]
-            else:
+            if not res:
                 continue
+            company_id = res[0]
 
             # C. PRICE SYNC
-            cursor.execute("INSERT INTO daily_prices (company_id, trade_date, close_price, volume) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE close_price=VALUES(close_price), volume=VALUES(volume)", 
-                           (company_id, datetime.now().date(), close_price, volume))
+            cursor.execute("""
+                INSERT INTO daily_prices (company_id, trade_date, close_price, volume) 
+                VALUES (%s, %s, %s, %s) 
+                ON DUPLICATE KEY UPDATE close_price=VALUES(close_price), volume=VALUES(volume)
+            """, (company_id, datetime.now().date(), close_price, volume))
 
-            # D. NEWS ENGINE (FIXED NESTING)
+            # D. NEWS & AI SENTIMENT ENGINE
             news_list = stock.news
             if news_list:
-                print(f"  🔍 Found {len(news_list)} news items. Processing...")
+                print(f"  🔍 Found {len(news_list)} news items.")
                 
                 for item in news_list[:5]:
-                    # NESTING FIX: Yahoo puts the good stuff inside 'content'
                     content = item.get('content', {})
-                    
                     rns_id = item.get('id') or content.get('id')
                     headline = content.get('title')
                     
                     if rns_id and headline:
+                        # Check if we already have this announcement
                         cursor.execute("SELECT rns_id FROM rns_announcements WHERE rns_id = %s", (rns_id,))
                         if not cursor.fetchone():
                             print(f"  🤖 AI Scoring: {headline[:50]}...")
                             sentiment = get_claude_sentiment(headline)
+                            
                             if sentiment is not None:
-                                cursor.execute("INSERT INTO rns_announcements (rns_id, company_id, timestamp, headline, sentiment_score) VALUES (%s, %s, %s, %s, %s)",
-                                               (rns_id, company_id, now_str, headline, sentiment))
+                                cursor.execute("""
+                                    INSERT INTO rns_announcements (rns_id, company_id, timestamp, headline, sentiment_score) 
+                                    VALUES (%s, %s, %s, %s, %s)
+                                """, (rns_id, company_id, now_str, headline, sentiment))
                                 print(f"    ✅ DB COMMIT: {sentiment}")
-                        else:
-                            # Already in DB
-                            pass
-                    else:
-                        # Log if we still can't find it (unlikely now)
-                        print(f"  ⚠️ Skipping item: ID found={bool(rns_id)}, Headline found={bool(headline)}")
             
             conn.commit()
             print(f"✅ {ticker} sync complete.")
 
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"❌ Error processing {ticker}: {e}")
             conn.rollback()
 
     cursor.close()
     conn.close()
-    print("--- 🏁 Ingest Complete ---")
+    print("\n--- 🏁 Dynamic Ingest Complete ---")
 
 if __name__ == "__main__":
     ingest_market_data()
