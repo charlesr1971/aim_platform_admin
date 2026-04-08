@@ -5,30 +5,31 @@ from db_utils import get_db_connection
 from datetime import datetime
 
 def render_login():
-    # 1. THE LOGO (Always at the very top of the page)
+    # 1. THE LOGO
     st.markdown("""
         <div class="logo-container">
             <img src="app/static/assets/images/png/logo/logo-597x597.png" class="logo-circular" style="width: 80px; height: 80px;">
         </div>
     """, unsafe_allow_html=True)
-    # --- NEW: POST-REGISTRATION WELCOME STATE ---
+
+    # --- POST-REGISTRATION WELCOME STATE ---
     if st.session_state.get('reg_success'):
         st.balloons()
-        st.success(f"🚀 Account Created Successfully for {st.session_state.reg_email}!")
+        st.success(f"🚀 Account Created Successfully!")
         st.markdown(f"""
             ### Welcome to the Terminal
             Your account for **{st.session_state.reg_email}** is now active on the **Free Tier**. 
             
             **What's next?**
             1. Click the button below to return to the login screen.
-            2. Enter your credentials in the **🔑 Login** tab.
+            2. Enter your credentials in the **Login** tab.
             3. Explore the terminal or upgrade to **Pro** for Claude-powered sentiment.
         """)
         if st.button("Got it, take me to Login"):
             del st.session_state.reg_success
             del st.session_state.reg_email
             st.rerun()
-        return # Stop execution here to hide the forms
+        return 
 
     st.markdown("""
         <div class="flex-header">
@@ -37,10 +38,6 @@ def render_login():
         </div>
     """, unsafe_allow_html=True)
 
-
-    # Toggle between Login and Registration
-    # tab1, tab2 = st.tabs(["🔑 Login", "📝 Create Account"])
-    # tab1, tab2 = st.tabs([":lock: Login", ":pencil: Create Account"])
     tab1, tab2 = st.tabs(["Login", "Create Account"])
 
     # --- TAB 1: LOGIN ---
@@ -62,6 +59,13 @@ def render_login():
         st.markdown("Join the AIM Insights platform to track startup performance.")
         
         with st.form("register_form"):
+            # New Name Fields
+            col1, col2 = st.columns(2)
+            with col1:
+                first_name = st.text_input("First Name").strip()
+            with col2:
+                last_name = st.text_input("Last Name").strip()
+                
             new_email = st.text_input("Email Address").lower().strip()
             new_pw = st.text_input("Choose Password", type="password")
             conf_pw = st.text_input("Confirm Password", type="password")
@@ -74,19 +78,18 @@ def render_login():
             submit_reg = st.form_submit_button("REGISTER")
             
             if submit_reg:
-                if captcha_ans != (st.session_state.captcha_a + st.session_state.captcha_b):
+                if not first_name or not last_name:
+                    st.error("❌ Please enter both your first and last name.")
+                elif captcha_ans != (st.session_state.captcha_a + st.session_state.captcha_b):
                     st.error("❌ Incorrect Bot Check answer.")
                 elif new_pw != conf_pw:
                     st.error("❌ Passwords do not match.")
                 elif len(new_pw) < 8:
                     st.error("❌ Password must be at least 8 characters.")
                 else:
-                    # Capture result of registration
-                    if process_registration(new_email, new_pw):
-                        # Set success state to trigger the Welcome Screen
+                    if process_registration(new_email, new_pw, first_name, last_name):
                         st.session_state.reg_success = True
                         st.session_state.reg_email = new_email
-                        # Clean up captcha
                         if 'captcha_a' in st.session_state: del st.session_state.captcha_a
                         if 'captcha_b' in st.session_state: del st.session_state.captcha_b
                         st.rerun()
@@ -96,14 +99,14 @@ def process_login(email, password):
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # MySQL 5.5 compatible select
+        # Updated SELECT to include first_name and last_name
         cur.execute("""
-            SELECT user_id, email, subscription_tier, is_admin, password_hash 
+            SELECT user_id, email, subscription_tier, is_admin, password_hash, first_name, last_name 
             FROM users WHERE email = %s
         """, (email,))
         user = cur.fetchone()
         
-        # Index-based mapping for MySQL 5.5 (0=id, 1=email, 2=tier, 3=admin, 4=hash)
+        # Index-based mapping: 0=id, 1=email, 2=tier, 3=admin, 4=hash, 5=fname, 6=lname
         if user and bcrypt.checkpw(password.encode('utf-8'), user[4].encode('utf-8')):
             now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cur.execute("UPDATE users SET last_login_at = %s WHERE user_id = %s", (now, user[0]))
@@ -113,6 +116,8 @@ def process_login(email, password):
                 "logged_in": True,
                 "user_id": user[0],
                 "email": user[1],
+                "first_name": user[5], # Added to session
+                "last_name": user[6],  # Added to session
                 "subscription_tier": user[2],
                 "is_admin": bool(user[3])
             })
@@ -126,7 +131,7 @@ def process_login(email, password):
     except Exception as e:
         st.error(f"Login Error: {e}")
 
-def process_registration(email, password):
+def process_registration(email, password, first_name, last_name):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -140,16 +145,17 @@ def process_registration(email, password):
         hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
+        # Updated INSERT to include first_name and last_name
         sql = """
-            INSERT INTO users (email, password_hash, subscription_tier, is_admin, created_at)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO users (email, first_name, last_name, password_hash, subscription_tier, is_admin, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
-        cur.execute(sql, (email, hashed, 'free', 0, now))
+        cur.execute(sql, (email, first_name, last_name, hashed, 'free', 0, now))
         conn.commit()
         
         cur.close()
         conn.close()
-        return True # Return true to trigger the UI change
+        return True 
     except Exception as e:
         st.error(f"Registration Error: {e}")
         return False

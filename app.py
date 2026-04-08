@@ -21,6 +21,8 @@ load_dotenv(dotenv_path=env_path)
 # 2. GLOBAL CONFIG
 st.set_page_config(page_title="AIM Insights | Terminal", layout="wide", initial_sidebar_state="expanded")
 
+display_name = st.session_state.get('first_name', 'Guest')
+
 def apply_modern_ui():
     st.markdown("""
         <style>
@@ -122,8 +124,26 @@ def apply_modern_ui():
                 text-decoration: none !important;
                 margin-bottom: 10px;
                 display: block;
-                text-align: center;
+                text-align: left;
                 font-weight: 600;
+            }
+            
+            .user-data-box span {
+                display: block;
+                text-overflow: ellipsis;
+                overflow: hidden;
+                white-space: nowrap;
+            }
+            
+            .user-data-box span.align-left {
+                position: relative;
+                left: 51px;
+                width: calc(100% - 61px);
+                text-align: left;
+            }
+            
+            .user-data-box span.align-center {
+                text-align: center;
             }
             
             .user-data-box a:link {
@@ -528,8 +548,9 @@ st.sidebar.markdown("""
 st.sidebar.title("") # Icon Removed
 
 # Custom Email Box
-st.sidebar.markdown(f'<div class="user-data-box"><div class="user-data-box-icon-panel"></div><i class="fa fa-user"></i> {st.session_state.email}</div>', unsafe_allow_html=True)
-st.sidebar.markdown(f'<div class="user-data-box last-of-type"><div class="user-data-box-icon-panel"></div><i class="fa fa-diamond" style="left:10px;"></i> {st.session_state.subscription_tier.upper()}</div>', unsafe_allow_html=True)
+st.sidebar.markdown(f'<div class="user-data-box"><span class="align-center"><strong>Welcome</strong> {display_name}</span></div>', unsafe_allow_html=True)
+st.sidebar.markdown(f'<div class="user-data-box"><div class="user-data-box-icon-panel"></div><i class="fa fa-user"></i><span class="align-left">{st.session_state.email}</span></div>', unsafe_allow_html=True)
+st.sidebar.markdown(f'<div class="user-data-box last-of-type"><div class="user-data-box-icon-panel"></div><i class="fa fa-diamond" style="left:10px;"></i><span class="align-left">{st.session_state.subscription_tier.upper()}</span></div>', unsafe_allow_html=True)
 
 if st.sidebar.button("LOGOUT"):
     for key in list(st.session_state.keys()):
