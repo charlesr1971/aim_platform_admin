@@ -43,12 +43,17 @@ def render_login():
     # --- TAB 1: LOGIN ---
     with tab1:
         with st.form("login_form"):
-            email = st.text_input("Email").lower().strip()
-            password = st.text_input("Password", type="password")
+            # Adding clear placeholders helps Chrome identify the field intent
+            email = st.text_input("Email", placeholder="email@example.com")
+            password = st.text_input("Password", type="password", placeholder="Password")
+            
             submit_login = st.form_submit_button("CONNECT")
             
             if submit_login:
-                process_login(email, password)
+                # Process the strings here instead of on the input line
+                clean_email = email.lower().strip()
+                process_login(clean_email, password)
+
 
     # --- TAB 2: REGISTRATION ---
     with tab2:
