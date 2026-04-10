@@ -3,6 +3,7 @@ import bcrypt
 import random
 from db_utils import get_db_connection
 from datetime import datetime
+import streamlit.components.v1 as components
 
 def render_login():
     # 1. THE LOGO
@@ -48,6 +49,49 @@ def render_login():
             password = st.text_input("Password", type="password", placeholder="Password")
             
             submit_login = st.form_submit_button("CONNECT")
+            
+            # Inject AFTER the form so the inputs exist in the DOM
+            components.html("""
+                <script>
+                    (function patchAutofill() {
+                        const doc = window.parent.document;
+        
+                        function applyAttrs() {
+                            const inputs = doc.querySelectorAll('input');
+                            let patched = 0;
+        
+                            inputs.forEach(input => {
+                                const placeholder = (input.placeholder || '').toLowerCase();
+                                const label = (input.getAttribute('aria-label') || '').toLowerCase();
+        
+                                if (input.type !== 'password' &&
+                                    (placeholder.includes('email') || label.includes('email'))) {
+                                    input.setAttribute('autocomplete', 'username');
+                                    input.setAttribute('name', 'username');
+                                    input.setAttribute('id', 'username');
+                                    patched++;
+                                }
+        
+                                if (input.type === 'password') {
+                                    input.setAttribute('autocomplete', 'current-password');
+                                    input.setAttribute('name', 'password');
+                                    input.setAttribute('id', 'password');
+                                    patched++;
+                                }
+                            });
+                            return patched;
+                        }
+        
+                        // Try immediately, then retry until fields appear
+                        if (applyAttrs() < 2) {
+                            const observer = new MutationObserver(() => {
+                                if (applyAttrs() >= 2) observer.disconnect();
+                            });
+                            observer.observe(doc.body, { childList: true, subtree: true });
+                        }
+                    })();
+                </script>
+            """, height=0)
             
             if submit_login:
                 # Process the strings here instead of on the input line
