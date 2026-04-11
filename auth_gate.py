@@ -2,10 +2,42 @@ import streamlit as st
 import bcrypt
 import random
 from db_utils import get_db_connection
-from datetime import datetime
+from datetime import datetime, timedelta
 import streamlit.components.v1 as components
+import extra_streamlit_components as stx  # <--- New Import
+
+# 1. Initialize manager at the module level
+cookie_manager = stx.CookieManager()
+
+# def render_login():
+#     # --- AUTO-LOGIN CHECK ---
+#     # Check if a cookie exists before showing the login form
+#     if not st.session_state.get('logged_in'):
+#         saved_email = cookie_manager.get(cookie="aim_user_token")
+#         # if saved_email and len(str(saved_email).strip()) > 0:
+#         if saved_email and str(saved_email).strip() not in ["", "None", "undefined"]:
+#             # Optionally: Re-verify against DB here, or just trust the cookie
+#             # To be safe, we call process_login_via_cookie
+#             if auto_login_user(saved_email):
+#                 st.rerun()
 
 def render_login():
+    # 1. CHECK FOR LOGOUT FLAG
+    # If we just hit 'Logout', skip the cookie check entirely for this run
+    if st.session_state.get('logging_out'):
+        # Clear the flag so they can log back in normally next time
+        del st.session_state['logging_out']
+    else:
+        # --- AUTO-LOGIN CHECK ---
+        if not st.session_state.get('logged_in'):
+            saved_email = cookie_manager.get(cookie="aim_user_token")
+            
+            # Extra safety: ensure it's a string and not "undefined"
+            if saved_email and str(saved_email).strip() not in ["", "None", "undefined"]:
+                if auto_login_user(saved_email):
+                    st.rerun()
+
+
     # 1. THE LOGO
     st.markdown("""
         <div class="logo-container">
@@ -143,6 +175,31 @@ def render_login():
                         if 'captcha_b' in st.session_state: del st.session_state.captcha_b
                         st.rerun()
 
+# --- NEW HELPER FOR AUTO-LOGIN ---
+def auto_login_user(email):
+    """Silent login for returning users with a cookie"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT user_id, email, subscription_tier, is_admin, first_name, last_name 
+            FROM users WHERE email = %s
+        """, (email,))
+        user = cur.fetchone()
+        if user:
+            st.session_state.update({
+                "logged_in": True, 
+                "user_id": user[0], 
+                "email": user[1],
+                "subscription_tier": user[2], 
+                "is_admin": bool(user[3]),
+                "first_name": user[4], 
+                "last_name": user[5]
+            })
+            return True
+        return False
+    except: return False                   
+                        
 def process_login(email, password):
     try:
         conn = get_db_connection()
@@ -161,6 +218,7 @@ def process_login(email, password):
             cur.execute("UPDATE users SET last_login_at = %s WHERE user_id = %s", (now, user[0]))
             conn.commit()
             
+            # 1. Update Session State
             st.session_state.update({
                 "logged_in": True,
                 "user_id": user[0],
@@ -170,6 +228,13 @@ def process_login(email, password):
                 "subscription_tier": user[2],
                 "is_admin": bool(user[3])
             })
+            
+            # 2. DROP THE COOKIE (30 Days)
+            cookie_manager.set(
+                cookie="aim_user_token",
+                val=email,
+                expires_at=datetime.now() + timedelta(days=30)
+            )
             
             cur.close()
             conn.close()

@@ -2,9 +2,19 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from db_utils import get_db_connection
+from ui_utils import apply_modern_ui
+
+apply_modern_ui()
 
 def render_admin_dashboard():
-    st.title("🛡️ ADMIN COMMAND CENTRE")
+    
+    st.markdown("""
+        <div class="flex-header">
+            <i class="fa fa-shield"></i>
+            <h1>Admin Command Centre</h1>
+        </div>
+    """, unsafe_allow_html=True)
+
     
     try:
         conn = get_db_connection()
@@ -27,7 +37,12 @@ def render_admin_dashboard():
         col3.metric("REV ESTIMATE", f"£{pro_users * 29:.2f}")
 
         # 2. GROWTH CHART (MySQL 5.5 Syntax)
-        st.subheader("USER COHORT GROWTH")
+        st.markdown("""
+            <div class="flex-subheader">
+                <i class="fa fa-bar-chart"></i>
+                <h3>User Cohort Growth</h3>
+            </div>
+        """, unsafe_allow_html=True)
         # We use DATE_FORMAT because MySQL 5.5 doesn't have date_trunc
         growth_query = """
             SELECT DATE_FORMAT(created_at, '%Y-%m-01') as month, count(*) as count 
@@ -46,12 +61,18 @@ def render_admin_dashboard():
                 xaxis_title="Registration Month",
                 yaxis_title="New Users"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            # st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
         else:
             st.info("No registration data available yet.")
 
         # 3. USER REGISTRY
-        st.subheader("SUBSCRIBER REGISTRY")
+        st.markdown("""
+            <div class="flex-subheader">
+                <i class="fa fa-database"></i>
+                <h3>Subscriber Registry</h3>
+            </div>
+        """, unsafe_allow_html=True)
         # Pulling raw data for the searchable dataframe
         raw_users = pd.read_sql("""
             SELECT user_id, email, subscription_tier, is_admin, last_login_at, created_at 
