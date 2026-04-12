@@ -245,6 +245,9 @@ if st.session_state.get('is_admin'):
         
 
 if st.sidebar.button("LOGOUT"):
+    # 1. Clear everything FIRST
+    st.session_state.clear()
+    
     # 1. Flag that we are intentionally logging out
     st.session_state['logging_out'] = True
     
