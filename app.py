@@ -30,6 +30,10 @@ cookie_manager = stx.CookieManager()
 env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
 load_dotenv(dotenv_path=env_path)
 
+# --- 1. SETUP ABSOLUTE PATH ---
+# Explicitly point to the file on your C: drive
+SYNC_FILE_PATH = os.getenv("LAST_SYNC_FILE_PATH")
+
 display_name = st.session_state.get('first_name', 'Guest')
 
 apply_modern_ui()
@@ -170,6 +174,21 @@ def get_live_ticker_string():
     except Exception as e:
         print(f"Ticker Error: {e}")
         return "SYNCING WITH TERMINAL..."
+        
+        
+@st.cache_data(ttl=86400) # Keep 24h as a safety fallback
+def get_company_list(last_sync_time):
+    try:
+        conn = get_db_connection()
+        # Fetch tickers and names
+        df = pd.read_sql("SELECT ticker, company_name FROM companies ORDER BY company_name ASC", conn)
+        conn.close()
+        if df.empty:
+            return pd.DataFrame([{"ticker": "GGP", "company_name": "Greatland Gold plc"}])
+        return df
+    except Exception as e:
+        # Fallback so the app doesn't go blank
+        return pd.DataFrame([{"ticker": "GGP", "company_name": "Greatland Gold plc"}])
 
 
 @st.dialog("Legal Disclaimer & Risk Warning")
@@ -309,12 +328,50 @@ st.markdown("""
         </div>
     """, unsafe_allow_html=True)
 
-ticker = st.text_input("ENTER AIM TICKER (e.g. JET2)", "GGP").upper()
+# ticker = st.text_input("ENTER AIM TICKER (e.g. JET2)", "KOD").upper()
+
+# 1. Fetch all company names and tickers from the DB
+# conn = get_db_connection()
+# df_companies = pd.read_sql("SELECT ticker, company_name FROM companies ORDER BY company_name ASC", conn)
+# conn.close()
+
+# 1. Read the "Flag" from the VPS disk
+try:
+    with open(SYNC_FILE_PATH, "r") as f:
+        # This will be something like "2026-05-10 07:30:00"
+        sync_key = f.read().strip() 
+except:
+    # If the file hasn't been created yet, use a default
+    sync_key = "initial_setup"
+
+# 2. Call the function with the Flag
+# If sync_key is the same as last time, Streamlit gives you the CACHED memory.
+# If sync_key is different (because of the .bat), Streamlit hits the DATABASE.
+df_companies = get_company_list(sync_key)
+
+# 3. Create a list of "Company Name (TICKER)" for the dropdown
+company_options = [f"{row['company_name']} ({row['ticker']})" for _, row in df_companies.iterrows()]
+
+if not company_options:
+        company_options = ["Greatland Gold plc (GGP)"]
+
+# 4. Searchable dropdown (Perfect for iPhone touch)
+selected_option = st.selectbox("SEARCH AIM COMPANIES", options=company_options, index=0)
+
+# 5. Extract the ticker from the selection (e.g., "Greatland Gold plc (GGP)" -> "GGP")
+ticker = selected_option.split('(')[-1].replace(')', '')
 
 col1, col2, col3 = st.columns(3)
 
-# --- DATABASE DATA FETCH ---
+# --- DATABASE & LIVE DATA FETCH ---
 try:
+    # 1. LIVE PRICE FETCH (Yahoo Finance)
+    with st.spinner(f"Fetching {ticker}..."):
+        live_price = fetch_aim_price(ticker)
+        # Convert Pence to Pounds if the number is high (e.g. 35.10 -> 0.3510)
+        display_price = live_price / 100 if live_price > 5 else live_price
+
+    # 2. DATABASE FETCH
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True, buffered=True)
 
@@ -327,24 +384,42 @@ try:
     """, (ticker,))
     db_data = cursor.fetchone()
 
-    if db_data:
-        # A. Volume Spike Alert
-        if db_data['volume'] > 1000000:
-            st.markdown(f'<div class="alert-card"><i class="fa fa-warning"></i> Unusual volume detected: {db_data["volume"]:,} shares</div>', unsafe_allow_html=True)
+    # --- 3. CALCULATE DELTA ---
+    price_delta = None
+    if db_data and db_data['close_price'] > 0:
+        change = ((live_price / db_data['close_price']) - 1) * 100
+        price_delta = f"{change:.2f}%"
 
-        raw_price = db_data['close_price']
-        display_price = raw_price / 100 if raw_price > 5 else raw_price
+    # --- UI: METRIC CARDS ---
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        # 1. The Visual Icon (The only thing you will see)
+        st.markdown('<i class="fa fa-refresh ref-icon"></i>', unsafe_allow_html=True)
         
-        col1.metric(f"{ticker} PRICE", f"£{display_price:.4f}")
-        col2.metric("DAILY VOLUME", f"{db_data['volume']:,}")
-        col3.metric("STAGE", "GROWTH")
-    else:
-        price = fetch_aim_price(ticker)
-        col1.metric(f"{ticker} PRICE", f"£{price:.2f}")
-        col2.metric("DAILY VOLUME", "N/A")
-        col3.metric("STAGE", "N/A")
+        # 2. The Invisible Button (The thing you will tap)
+        if st.button(" ", key="refresh_price_btn"):
+            st.rerun()
+            
+        # 3. The Metric
+        st.metric(f"{ticker} PRICE", f"£{display_price:.4f}", delta=price_delta)
+
+    with col2:
+        st.metric("DAILY VOLUME", f"{db_data['volume']:,}" if db_data else "0")
+
+    with col3:
+        st.metric("STAGE", "GROWTH" if db_data else "N/A")
+
+    # --- 5. VOLUME ALERT (Moved Below Cards) ---
+    if db_data and db_data['volume'] > 1000000:
+        st.markdown(f"""
+            <div class="alert-card">
+                <i class="fa fa-warning"></i> Unusual volume detected: {db_data['volume']:,} shares
+            </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
+
 
     # B. CLAUDE 4.6 SENTIMENT FEED
     

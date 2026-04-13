@@ -268,8 +268,14 @@ def apply_modern_ui():
                 border-radius: 12px;
                 box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
             }
-            [data-testid="stMetricValue"] { color: #1e293b !important; font-weight: 700 !important; }
-            [data-testid="stMetricLabel"] { color: #64748b !important; font-weight: 600 !important; }
+            [data-testid="stMetricValue"] { 
+                color: #1e293b !important; 
+                font-weight: 700 !important; 
+            }
+            [data-testid="stMetricLabel"] { 
+                color: #64748b !important; 
+                font-weight: 600 !important; 
+            }
 
             /* CLEAN NEWS CARDS */
             .news-card { 
@@ -288,6 +294,52 @@ def apply_modern_ui():
             } 
             header {
                 visibility: hidden;
+            }
+            
+            /* 1. ANCHOR THE COLUMN */
+            [data-testid="column"] {
+                position: relative !important;
+            }
+
+            /* 2. THE VISUAL ICON (Visual Only) */
+            .ref-icon {
+                position: absolute !important;
+                top: 40px;     /* Aligned with 'Price' Metric label */
+                right: 25px;   /* Inside card padding */
+                color: #3b82f6;
+                font-size: 0.95rem;
+                z-index: 5;    
+                pointer-events: none; 
+                opacity: 0.8;
+            }
+
+            /* 3. THE GHOST BUTTON (The "Silver Bullet" Visibility Fix) */
+            /* We target the container key and force it to be small */
+            .st-key-refresh_price_btn {
+                position: absolute !important;
+                top: 32px !important;   
+                right: 15px !important;
+                width: 45px !important;  
+                height: 45px !important;
+                z-index: 10 !important;  
+                background: transparent !important;
+            }
+
+            /* Force the inner Streamlit button to be invisible but clickable */
+            .st-key-refresh_price_btn button {
+                opacity: 0 !important;           /* MAKES IT TOTALLY INVISIBLE */
+                width: 100% !important;          /* Keeps it as a 45px tap target */
+                height: 100% !important;
+                border: none !important;
+                background: transparent !important;
+                box-shadow: none !important;
+                min-height: unset !important;
+                cursor: pointer !important;
+            }
+
+            /* Force the internal stButton div to stop being 370px wide */
+            .st-key-refresh_price_btn div[data-testid="stButton"] {
+                width: 45px !important;
             }
 
             /* MODERN BUTTONS */

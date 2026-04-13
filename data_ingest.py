@@ -12,6 +12,10 @@ from pathlib import Path
 env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
 load_dotenv(dotenv_path=env_path)
 
+# --- 2. SETUP ABSOLUTE PATH ---
+# Explicitly point to the file on your C: drive
+SYNC_FILE_PATH = os.getenv("LAST_SYNC_FILE_PATH")
+
 def get_active_tickers():
     """Loads the latest discovered tickers from the JSON file."""
     path = r"C:\inetpub\wwwroot\aim_platform_admin\active_tickers.json"
@@ -74,12 +78,16 @@ def ingest_market_data():
 
             # --- NEW: Fetch Share Capital (Shares Outstanding) ---
             # .info can be slow, so we use a try/except specifically for it
+            full_name = ticker
             share_capital = 0
+            
             try:
                 print(f"  📊 Fetching share capital for {ticker}...")
-                share_capital = stock.info.get('sharesOutstanding', 0)
-            except:
-                pass
+                info = stock.info
+                full_name = info.get('longName', ticker)
+                share_capital = info.get('sharesOutstanding', 0)
+            except Exception as info_err:
+                print(f"  ⚠️ Info fetch skipped: {info_err}")
 
             # B. AUTO-POPULATE COMPANY TABLE
             # We add the enlarged_share_capital to the INSERT/UPDATE logic
@@ -89,7 +97,7 @@ def ingest_market_data():
                 ON DUPLICATE KEY UPDATE 
                     company_name=VALUES(company_name),
                     enlarged_share_capital=VALUES(enlarged_share_capital)
-            """, (ticker, ticker, share_capital))
+            """, (ticker, full_name, share_capital))
 
             
             cursor.execute("SELECT company_id FROM companies WHERE ticker = %s", (ticker,))
@@ -138,7 +146,14 @@ def ingest_market_data():
 
     cursor.close()
     conn.close()
-    print("\n--- 🏁 Dynamic Ingest Complete ---")
-
+    print("\n--- 🏁 Dynamic Ingest Complete ---")  
+    
 if __name__ == "__main__":
     ingest_market_data()
+    
+    # At the very end of the script, after conn.close()
+    with open(SYNC_FILE_PATH, "w") as f:
+        f.write(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        
+    print("🚀 Cache Buster updated.") 
+    
