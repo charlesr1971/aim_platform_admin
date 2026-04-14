@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 from fpdf import FPDF
 import io
+import yfinance as yf
 
 from ui_utils import apply_modern_ui
 
@@ -54,6 +55,39 @@ def generate_7day_report(ticker):
         # Ensure the parameter is passed as a tuple (ticker,)
         df = pd.read_sql(query, conn, params=(ticker,))
         conn.close()
+        
+        # --- LIVE FALLBACK: Optimized for Yahoo's nested structure ---
+        if df.empty:
+            print(f"🔎 No DB data for {ticker}. Fetching live news fallback...")
+            stock = yf.Ticker(f"{ticker}.L")
+            news_list = stock.news
+            
+            if news_list:
+                live_news = []
+                for item in news_list:
+                    # 1. Correctly extract the headline (Nested in Yahoo's 'content')
+                    content = item.get('content', {})
+                    headline = content.get('title') or item.get('title') or "Market Update"
+                    
+                    # 2. Correctly handle the timestamp
+                    # Yahoo usually provides 'providerPublishTime' as a Unix timestamp
+                    pub_time = item.get('providerPublishTime')
+                    if pub_time:
+                        dt_object = datetime.fromtimestamp(pub_time)
+                    else:
+                        dt_object = datetime.now()
+
+                    # 3. Only include news from the last 7 days
+                    if dt_object >= (datetime.now() - timedelta(days=7)):
+                        live_news.append({
+                            'timestamp': dt_object,
+                            'headline': headline,
+                            'sentiment_score': 0.0 # Placeholder (Real-time scoring is slow for PDFs)
+                        })
+                
+                if live_news:
+                    df = pd.DataFrame(live_news)
+        # --- END FALLBACK ---
 
         pdf = FPDF()
         pdf.add_page()
@@ -477,8 +511,12 @@ if st.session_state.subscription_tier == 'pro':
     with t2:
         st.markdown('<div class="flex-subheader"><i class="fa fa-file-pdf-o"></i><h3>7-Day Sentiment Summary</h3></div>', unsafe_allow_html=True)
         
-        # User selects the ticker
-        report_ticker = st.selectbox("Select Company", ["GGP", "JET2", "VLX", "HE1", "HVO", "KOD"])
+        # 1. Use your dynamic company list instead of the hardcoded one
+        # Note: We add a unique 'key' because Streamlit doesn't like two identical selectboxes
+        report_selection = st.selectbox("Select Company for Report", options=company_options, key="report_selector")
+        
+        # 2. Extract the ticker for the PDF function
+        report_ticker = report_selection.split('(')[-1].replace(')', '').strip()
         
         if st.button(f"Compile {report_ticker} Data"):
             with st.spinner(f"Generating PDF for {report_ticker}..."):

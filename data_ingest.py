@@ -15,18 +15,26 @@ SYNC_FILE_PATH = os.getenv("LAST_SYNC_FILE_PATH")
 ACTIVE_TICKERS_PATH = os.getenv("ACTIVE_TICKERS_PATH")
 
 def get_active_tickers():
-    """Loads the latest discovered tickers from the JSON file."""
+    """Loads discovered tickers and merges them with your Core Must-Follow list."""
+    tickers = []  # Start with an empty list so we don't crash if the file is missing
+    
+    # 1. Try to load the dynamic movers from the JSON
     try:
         with open(ACTIVE_TICKERS_PATH, 'r') as f:
             data = json.load(f)
             tickers = data.get('tickers', [])
-            if tickers:
-                return tickers
     except Exception as e:
         print(f"⚠️ Could not load active_tickers.json: {e}")
+
+    # 2. Define your "Core" stocks (The ones you ALWAYS want data for)
+    # We use the .L suffix to match Yahoo Finance requirements
+    core_list = ["GGP.L", "KOD.L", "JET2.L", "VLX.L", "HE1.L", "HVO.L"]
     
-    # Final safety fallback to your core 6
-    return ["GGP", "JET2", "VLX", "HE1", "HVO", "KOD"]
+    # 3. Merge both lists and Remove Duplicates using set()
+    # This ensures KOD is processed even if it wasn't a "top mover" today.
+    final_list = list(set(core_list + tickers))
+    
+    return final_list
 
 def get_claude_sentiment(headline):
     """Scores RNS sentiment using Claude 4.6."""
