@@ -5,6 +5,7 @@ st.set_page_config(page_title="AIM Insights | Terminal", layout="wide", initial_
 
 import stripe
 import os
+import env_loader
 import pandas as pd
 import plotly.express as px
 from auth_gate import render_login
@@ -25,10 +26,6 @@ import extra_streamlit_components as stx  # <--- New Import
 
 # 1. Initialize manager at the module level
 cookie_manager = stx.CookieManager()
-
-# 2. SECURE ENVIRONMENT LOAD
-env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
-load_dotenv(dotenv_path=env_path)
 
 # --- 1. SETUP ABSOLUTE PATH ---
 # Explicitly point to the file on your C: drive

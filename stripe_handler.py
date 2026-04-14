@@ -1,12 +1,9 @@
 import stripe
 import os
+import env_loader
 from db_utils import get_db_connection
-from dotenv import load_dotenv
 from pathlib import Path
 
-# 1. SECURE LOAD from your VPS secrets folder
-env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
-load_dotenv(dotenv_path=env_path)
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 

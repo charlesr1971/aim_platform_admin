@@ -1,11 +1,8 @@
 import os
-from dotenv import load_dotenv
+import env_loader
 from pathlib import Path
 from db_utils import get_db_connection
 
-# 1. Point to the secure secrets folder
-env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
-load_dotenv(dotenv_path=env_path)
 
 def verify_setup():
     print("--- Environment Check ---")

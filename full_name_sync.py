@@ -1,5 +1,6 @@
 import yfinance as yf
 import os
+import env_loader
 from db_utils import get_db_connection
 from datetime import datetime
 

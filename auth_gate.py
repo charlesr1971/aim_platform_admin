@@ -9,17 +9,6 @@ import extra_streamlit_components as stx  # <--- New Import
 # 1. Initialize manager at the module level
 cookie_manager = stx.CookieManager()
 
-# def render_login():
-#     # --- AUTO-LOGIN CHECK ---
-#     # Check if a cookie exists before showing the login form
-#     if not st.session_state.get('logged_in'):
-#         saved_email = cookie_manager.get(cookie="aim_user_token")
-#         # if saved_email and len(str(saved_email).strip()) > 0:
-#         if saved_email and str(saved_email).strip() not in ["", "None", "undefined"]:
-#             # Optionally: Re-verify against DB here, or just trust the cookie
-#             # To be safe, we call process_login_via_cookie
-#             if auto_login_user(saved_email):
-#                 st.rerun()
 
 def render_login():
     # 1. CHECK FOR LOGOUT FLAG

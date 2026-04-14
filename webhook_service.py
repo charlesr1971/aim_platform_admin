@@ -1,13 +1,10 @@
 from fastapi import FastAPI, Request, Header, HTTPException
 import stripe
 import os
+import env_loader
 from stripe_handler import handle_webhook_payload
-from dotenv import load_dotenv
 from pathlib import Path
 
-# 1. SECURE SETUP
-env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
-load_dotenv(dotenv_path=env_path)
 
 app = FastAPI()
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")

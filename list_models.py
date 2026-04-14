@@ -1,11 +1,8 @@
 import os
+import env_loader
 import anthropic
-from dotenv import load_dotenv
 from pathlib import Path
 
-# Load from your secure secrets path
-env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
-load_dotenv(dotenv_path=env_path)
 
 def list_allowed_models():
     print("--- Querying Available Anthropic Models ---")

@@ -1,18 +1,15 @@
 import yfinance as yf
 import anthropic
 import os
+import env_loader
 import json
 import mysql.connector
 from db_utils import get_db_connection
 from datetime import datetime
-from dotenv import load_dotenv
 from pathlib import Path
 
-# 1. SECURE ENVIRONMENT LOAD
-env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
-load_dotenv(dotenv_path=env_path)
 
-# --- 2. SETUP ABSOLUTE PATH ---
+# --- 1. SETUP ABSOLUTE PATH ---
 # Explicitly point to the file on your C: drive
 SYNC_FILE_PATH = os.getenv("LAST_SYNC_FILE_PATH")
 

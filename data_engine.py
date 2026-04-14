@@ -1,12 +1,9 @@
 import yfinance as yf
 import anthropic
 import os
-from dotenv import load_dotenv
+import env_loader
 from pathlib import Path
 
-# Load from your secure secrets path
-env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
-load_dotenv(dotenv_path=env_path)
 
 def fetch_aim_price(ticker):
     """Fetches price from Yahoo Finance using the .L suffix for AIM."""

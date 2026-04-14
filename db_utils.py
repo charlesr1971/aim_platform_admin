@@ -1,12 +1,8 @@
 import mysql.connector
 import os
-from dotenv import load_dotenv
+import env_loader
 from pathlib import Path
 
-# --- SECURE PATH CONFIG ---
-# Explicitly point to the folder above your webroot
-env_path = Path(r"C:\inetpub\secrets\aim_platform_admin\.env")
-load_dotenv(dotenv_path=env_path)
 
 def get_db_connection():
     """Connects to Local MySQL using the secure .env location."""
