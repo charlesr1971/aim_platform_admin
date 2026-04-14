@@ -27,9 +27,10 @@ import extra_streamlit_components as stx  # <--- New Import
 # 1. Initialize manager at the module level
 cookie_manager = stx.CookieManager()
 
-# --- 1. SETUP ABSOLUTE PATH ---
+# --- 1. SETUP ABSOLUTE PATHS ---
 # Explicitly point to the file on your C: drive
 SYNC_FILE_PATH = os.getenv("LAST_SYNC_FILE_PATH")
+LOGO_FILE_PATH = os.getenv("LOGO_FILE_PATH")
 
 display_name = st.session_state.get('first_name', 'Guest')
 
@@ -58,9 +59,8 @@ def generate_7day_report(ticker):
         pdf.add_page()
         
         # 1. ADD BRAND LOGO (Top Left)
-        logo_path = r"C:\inetpub\wwwroot\aim_platform_admin\static\assets\images\png\logo\logo-597x597.png"
-        if os.path.exists(logo_path):
-            pdf.image(logo_path, 10, 8, 20) # Logo is 20mm wide
+        if LOGO_FILE_PATH and os.path.exists(LOGO_FILE_PATH):
+            pdf.image(LOGO_FILE_PATH, 10, 8, 20) # Logo is 20mm wide
         
         # 2. HEADER (Nudged right to avoid overlap)
         pdf.set_font("Arial", 'B', 18)

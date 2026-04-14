@@ -9,15 +9,15 @@ from datetime import datetime
 from pathlib import Path
 
 
-# --- 1. SETUP ABSOLUTE PATH ---
+# --- 1. SETUP ABSOLUTE PATHS ---
 # Explicitly point to the file on your C: drive
 SYNC_FILE_PATH = os.getenv("LAST_SYNC_FILE_PATH")
+ACTIVE_TICKERS_PATH = os.getenv("ACTIVE_TICKERS_PATH")
 
 def get_active_tickers():
     """Loads the latest discovered tickers from the JSON file."""
-    path = r"C:\inetpub\wwwroot\aim_platform_admin\active_tickers.json"
     try:
-        with open(path, 'r') as f:
+        with open(ACTIVE_TICKERS_PATH, 'r') as f:
             data = json.load(f)
             tickers = data.get('tickers', [])
             if tickers:

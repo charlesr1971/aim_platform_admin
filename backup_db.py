@@ -5,9 +5,13 @@ from datetime import datetime
 from pathlib import Path
 
 
+# --- 1. SETUP ABSOLUTE PATHS ---
+# Explicitly point to the file on your C: drive
+BACKUP_DB_PATH = os.getenv("BACKUP_DB_PATH")
+
 def run_backup():
     # 2. Setup Paths
-    backup_dir = Path(r"C:\inetpub\backups\aim_platform_admin")
+    backup_dir = Path(BACKUP_DB_PATH)
     backup_dir.mkdir(parents=True, exist_ok=True)
     
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")

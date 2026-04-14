@@ -3,6 +3,11 @@ import requests
 import json
 from datetime import datetime
 
+
+# --- 1. SETUP ABSOLUTE PATHS ---
+# Explicitly point to the file on your C: drive
+ACTIVE_TICKERS_PATH = os.getenv("ACTIVE_TICKERS_PATH")
+
 def get_live_market_movers():
     """
     Scrapes Yahoo Finance UK Day Gainers to find the top 10 
@@ -35,8 +40,7 @@ def get_live_market_movers():
         top_movers = [f"{s}.L" for s in df_filtered['Symbol'].head(10).tolist()]
         
         # Save to the JSON handoff file for data_ingest.py
-        output_path = r"C:\inetpub\wwwroot\aim_platform_admin\active_tickers.json"
-        with open(output_path, 'w') as f:
+        with open(ACTIVE_TICKERS_PATH, 'w') as f:
             json.dump({
                 "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "tickers": top_movers
