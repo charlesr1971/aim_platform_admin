@@ -42,9 +42,9 @@ def generate_7day_report(ticker):
     try:
         conn = get_db_connection()
         
-        # FIXED: Cleaner syntax for MySQL 5.5 compatibility
+        # 1. UPDATED QUERY: Added 'ra.sentiment_rationale' to the SELECT
         query = """
-            SELECT ra.timestamp, ra.headline, ra.sentiment_score 
+            SELECT ra.timestamp, ra.headline, ra.sentiment_score, ra.sentiment_rationale 
             FROM rns_announcements ra
             INNER JOIN companies c ON ra.company_id = c.company_id
             WHERE c.ticker = %s 
@@ -119,23 +119,20 @@ def generate_7day_report(ticker):
             pdf.cell(0, 10, "No RNS announcements found in the last 7 days.", ln=True)
         else:
             for _, row in df.iterrows():
-                # --- CLEAN THE TEXT FOR LATIN-1 COMPATIBILITY ---
+                # --- CLEAN THE HEADLINE ---
                 headline = row['headline']
-                # Replaces curly quotes, long dashes, and other non-latin characters
                 headline = headline.replace('\u2019', "'").replace('\u2018', "'").replace('\u2014', "-")
                 headline = headline.encode('latin-1', 'replace').decode('latin-1')
-                headline = headline.replace('?', "'") # 'replace' often turns smart quotes into ?
+                headline = headline.replace('?', "'")
                 
-                # Headline
+                # Headline [BOLD]
                 pdf.set_font("Arial", 'B', 11)
                 pdf.set_text_color(30, 41, 59)
                 pdf.multi_cell(0, 7, f"[{row['timestamp'].strftime('%d %b')}] {headline}")
                 
-                # Sentiment Score
+                # Sentiment Score [COLORED BOLD]
                 pdf.set_font("Arial", 'B', 10)
                 score = row['sentiment_score']
-                
-                # Color coding the sentiment text
                 if score > 0.3:
                     pdf.set_text_color(16, 185, 129) # Green
                     status = "BULLISH"
@@ -147,14 +144,25 @@ def generate_7day_report(ticker):
                     status = "NEUTRAL"
                     
                 pdf.cell(0, 7, f"AI SENTIMENT SCORE: {score} ({status})", ln=True)
-                pdf.ln(4)
+                
+                # --- NEW: DETAIL SECTION [REGULAR TEXT] ---
+                pdf.set_font("Arial", '', 9)
+                pdf.set_text_color(100, 116, 139) # Slate Grey
+                
+                # Fetch and clean the rationale text
+                detail = str(row.get('sentiment_rationale') or "Analysis details pending next data sync.")
+                detail = detail.replace('\u2019', "'").replace('\u2018', "'").replace('\u2014', "-")
+                detail = detail.encode('latin-1', 'replace').decode('latin-1')
+                detail = detail.replace('?', "'")
+                
+                pdf.multi_cell(0, 5, f"Detail: {detail}")
+                pdf.ln(2) # Small space after detail
                 
                 # Subtle grey divider
                 pdf.set_draw_color(226, 232, 240)
                 pdf.line(10, pdf.get_y(), 200, pdf.get_y())
                 pdf.ln(4)
 
-        # Output to bytes
         return pdf.output(dest='S').encode('latin-1')
     except Exception as e:
         st.error(f"Error building PDF: {e}")
@@ -342,6 +350,7 @@ st.sidebar.markdown("""
 
 
 # 7. MAIN INTERFACE (Dynamic Ticker)
+
 live_data = get_live_ticker_string()
 st.markdown(f"""
     <div class="ticker-wrap">
@@ -386,11 +395,32 @@ company_options = [f"{row['company_name']} ({row['ticker']})" for _, row in df_c
 if not company_options:
         company_options = ["Greatland Gold plc (GGP)"]
 
-# 4. Searchable dropdown (Perfect for iPhone touch)
-selected_option = st.selectbox("SEARCH AIM COMPANIES", options=company_options, index=0)
+# --- PERSISTENT TICKER SELECTOR ---
+# 4. Try to get the "Last Viewed Ticker" from the Cookie or Session
+# If none found, default to 'GGP'
+saved_ticker = cookie_manager.get("last_ticker") or st.session_state.get("current_ticker", "GGP")
 
-# 5. Extract the ticker from the selection (e.g., "Greatland Gold plc (GGP)" -> "GGP")
-ticker = selected_option.split('(')[-1].replace(')', '')
+# 5. Find the index of that ticker in your dynamic list
+# This ensures the dropdown 'points' to the right company on reload
+default_index = 0
+try:
+    for i, opt in enumerate(company_options):
+        if f"({saved_ticker})" in opt:
+            default_index = i
+            break
+except:
+    default_index = 0
+
+# 6. Searchable dropdown (Perfect for iPhone touch)
+selected_option = st.selectbox("SEARCH AIM COMPANIES", options=company_options, index=default_index, key="main_ticker_selector")
+
+# 7. Extract the ticker from the selection (e.g., "Greatland Gold plc (GGP)" -> "GGP")
+ticker = selected_option.split('(')[-1].replace(')', '').strip()
+
+# 8. Crucial: Update both Session and Cookie every time the ticker changes
+if ticker != saved_ticker:
+    st.session_state["current_ticker"] = ticker
+    cookie_manager.set("last_ticker", ticker, expires_at=datetime.now() + timedelta(days=30))
 
 col1, col2, col3 = st.columns(3)
 

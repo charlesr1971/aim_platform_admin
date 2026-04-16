@@ -296,50 +296,66 @@ def apply_modern_ui():
                 visibility: hidden;
             }
             
-            /* 1. ANCHOR THE COLUMN */
+            /* 1. UNIFORM CARD HEIGHT */
+            div[data-testid="stMetric"] {
+                min-height: 155px !important; 
+                background-color: #ffffff;
+                border: 1px solid #e2e8f0;
+                padding: 1.5rem;
+                border-radius: 12px;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+                position: relative;
+            }
+
+            /* 2. ANCHOR THE COLUMN */
             [data-testid="column"] {
                 position: relative !important;
             }
 
-            /* 2. THE VISUAL ICON (Visual Only) */
-            .ref-icon {
-                position: absolute !important;
-                top: 40px;     /* Aligned with 'Price' Metric label */
-                right: 25px;   /* Inside card padding */
-                color: #3b82f6;
-                font-size: 0.95rem;
-                z-index: 5;    
-                pointer-events: none; 
-                opacity: 0.8;
-            }
-
-            /* 3. THE GHOST BUTTON (The "Silver Bullet" Visibility Fix) */
-            /* We target the container key and force it to be small */
+            /* 3. NEUTRALIZE CONTAINERS (Zero height, Full width) */
+            [data-testid="stElementContainer"]:has(.ref-icon),
             .st-key-refresh_price_btn {
                 position: absolute !important;
-                top: 32px !important;   
-                right: 15px !important;
-                width: 45px !important;  
-                height: 45px !important;
-                z-index: 10 !important;  
-                background: transparent !important;
+                height: 0px !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                z-index: 10;
+                top: 0;
+                left: 0;
             }
 
-            /* Force the inner Streamlit button to be invisible but clickable */
+            /* 4. THE VISUAL ICON (Symmetry: 25px Top, 25px Right) */
+            .ref-icon {
+                position: absolute !important;
+                top: 25px !important;   /* MATCH TOP */
+                right: 25px !important; /* MATCH RIGHT */
+                color: #3b82f6;
+                font-size: 0.95rem;
+                pointer-events: none; 
+                opacity: 0.8;
+                z-index: 11;
+            }
+
+            /* 5. THE GHOST BUTTON (Moving tap zone up to follow icon) */
             .st-key-refresh_price_btn button {
-                opacity: 0 !important;           /* MAKES IT TOTALLY INVISIBLE */
-                width: 100% !important;          /* Keeps it as a 45px tap target */
-                height: 100% !important;
+                opacity: 0 !important;
+                width: 45px !important;
+                height: 45px !important;
+                position: absolute !important;
+                top: 15px !important;   /* Nudged up to center tap zone over icon */
+                right: 15px !important;
                 border: none !important;
                 background: transparent !important;
                 box-shadow: none !important;
                 min-height: unset !important;
-                cursor: pointer !important;
+                z-index: 12 !important;
             }
 
-            /* Force the internal stButton div to stop being 370px wide */
+            /* 6. FORCE THE BUTTON CONTAINER TO SHRINK */
             .st-key-refresh_price_btn div[data-testid="stButton"] {
-                width: 45px !important;
+                width: 100% !important;
+                height: 0px !important;
             }
 
             /* MODERN BUTTONS */
