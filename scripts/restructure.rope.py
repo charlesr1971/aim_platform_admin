@@ -70,3 +70,38 @@ finally:
     proj.close()
 
 print("\nDone. All files moved and imports updated.")
+
+# ─── Step 5: Update .bat files manually ───────────────────────────────────────
+
+print("\nUpdating .bat files...")
+
+BAT_FOLDER = os.path.join(PROJECT_ROOT, 'bat')
+
+# Define which script names need to change to which module paths
+REPLACEMENTS = {
+    "data_ingest.py":      "-m py.schedule.data_ingest",
+    "discovery_engine.py": "-m py.schedule.discovery_engine",
+    "backup_db.py":        "-m py.schedule.backup_db",
+    "full_name_sync.py":   "-m py.schedule.full_name_sync",
+    "test_env.py":         "-m py.diagnostics.test_env",
+    "test_claude.py":      "-m py.diagnostics.test_claude",
+    "list_models.py":      "-m py.diagnostics.list_models",
+    "register_admin.py":   "-m py.diagnostics.register_admin"
+}
+
+for bat_file in os.listdir(BAT_FOLDER):
+    if bat_file.endswith(".bat"):
+        path = os.path.join(BAT_FOLDER, bat_file)
+        
+        with open(path, 'r') as f:
+            content = f.read()
+
+        new_content = content
+        for old, new in REPLACEMENTS.items():
+            # Replace the old 'script.py' with '-m py.path.script'
+            new_content = new_content.replace(old, new)
+
+        if new_content != content:
+            with open(path, 'w') as f:
+                f.write(new_content)
+            print(f"  ✔ Updated: {bat_file}")
