@@ -16,3 +16,15 @@ If you run this script twice, the files won’t be at their original root locati
 ```
 py -m pip install rope
 ```
+### Windows Task Scheduler
+
+
+Action: Start a program
+
+Program/script: C:\inetpub\wwwroot\aim_platform_admin\bat\Run_Manual_Discovery_Engine.bat
+Program/script: C:\inetpub\wwwroot\aim_platform_admin\bat\Run_Manual_Ingest.bat
+Program/script: C:\inetpub\wwwroot\aim_platform_admin\bat\Run_Manual_Backup_DB.bat
+
+Add arguments (Optional): [LEAVE BLANK - Delete data_ingest.py]
+
+Start in (Optional): C:\inetpub\wwwroot\aim_platform_admin
