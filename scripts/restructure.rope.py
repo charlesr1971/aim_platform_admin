@@ -12,27 +12,28 @@ NEW_FOLDERS = ['py', 'py/imports', 'py/schedule', 'py/diagnostics']
 
 MOVES = [
     # py/imports/
-    ('env_loader.py',       'py/imports'),
-    ('db_utils.py',         'py/imports'),
-    ('auth_gate.py',        'py/imports'),
-    ('admin.py',            'py/imports'),
-    ('data_engine.py',      'py/imports'),
-    ('analytics_engine.py', 'py/imports'),
-    ('stripe_handler.py',   'py/imports'),
-    ('ui_utils.py',         'py/imports'),
-    ('style_utils.py',      'py/imports'),
+    ('env_loader.py',           'py/imports'),
+    ('db_utils.py',             'py/imports'),
+    ('auth_gate.py',            'py/imports'),
+    ('admin.py',                'py/imports'),
+    ('data_engine.py',          'py/imports'),
+    ('analytics_engine.py',     'py/imports'),
+    ('stripe_handler.py',       'py/imports'),
+    ('ui_utils.py',             'py/imports'),
+    ('style_utils.py',          'py/imports'),
 
     # py/schedule/
-    ('data_ingest.py',      'py/schedule'),
-    ('discovery_engine.py', 'py/schedule'),
-    ('backup_db.py',        'py/schedule'),
-    ('full_name_sync.py',   'py/schedule'),
+    ('data_ingest.py',          'py/schedule'),
+    ('discovery_engine.py',     'py/schedule'),
+    ('backup_db.py',            'py/schedule'),
+    ('full_name_sync.py',       'py/schedule'),
 
     # py/diagnostics/
-    ('test_env.py',         'py/diagnostics'),
-    ('test_claude.py',      'py/diagnostics'),
-    ('list_models.py',      'py/diagnostics'),
-    ('register_admin.py',   'py/diagnostics'),
+    ('test_env.py',             'py/diagnostics'),
+    ('test_claude.py',          'py/diagnostics'),
+    ('list_models.py',          'py/diagnostics'),
+    ('register_admin.py',       'py/diagnostics'),
+    ('sentiment_backfill.py',   'py/diagnostics'),
 ]
 
 # ─── Step 3: Create folders + __init__.py files ────────────────────────────────
@@ -79,15 +80,17 @@ BAT_FOLDER = os.path.join(PROJECT_ROOT, 'bat')
 
 # Define which script names need to change to which module paths
 REPLACEMENTS = {
-    "data_ingest.py":      "-m py.schedule.data_ingest",
-    "discovery_engine.py": "-m py.schedule.discovery_engine",
-    "backup_db.py":        "-m py.schedule.backup_db",
-    "full_name_sync.py":   "-m py.schedule.full_name_sync",
-    "test_env.py":         "-m py.diagnostics.test_env",
-    "test_claude.py":      "-m py.diagnostics.test_claude",
-    "list_models.py":      "-m py.diagnostics.list_models",
-    "register_admin.py":   "-m py.diagnostics.register_admin"
+    "data_ingest.py":           "-m py.schedule.data_ingest",
+    "discovery_engine.py":      "-m py.schedule.discovery_engine",
+    "backup_db.py":             "-m py.schedule.backup_db",
+    "full_name_sync.py":        "-m py.schedule.full_name_sync",
+    "test_env.py":              "-m py.diagnostics.test_env",
+    "test_claude.py":           "-m py.diagnostics.test_claude",
+    "list_models.py":           "-m py.diagnostics.list_models",
+    "register_admin.py":        "-m py.diagnostics.register_admin",
+    "sentiment_backfill.py":    "-m py.diagnostics.sentiment_backfill",
 }
+
 
 for bat_file in os.listdir(BAT_FOLDER):
     if bat_file.endswith(".bat"):

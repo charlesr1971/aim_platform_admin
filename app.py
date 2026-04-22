@@ -38,11 +38,19 @@ display_name = st.session_state.get('first_name', 'Guest')
 apply_modern_ui()
 
 def generate_7day_report(ticker):
-    """Generates a 7-day branded sentiment report."""
+    """Generates a 7-day report: Shows news if found, otherwise shows Quiet Period."""
     try:
         conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
         
-        # 1. UPDATED QUERY: Added 'ra.sentiment_rationale' to the SELECT
+        clean_ticker = ticker.replace('.L', '').strip()
+        
+        # 1. FETCH FULL NAME
+        cursor.execute("SELECT company_name FROM companies WHERE ticker = %s", (clean_ticker,))
+        comp_res = cursor.fetchone()
+        full_name = comp_res['company_name'] if comp_res else clean_ticker
+
+        # 2. FETCH NEWS FOR LAST 7 DAYS
         query = """
             SELECT ra.timestamp, ra.headline, ra.sentiment_score, ra.sentiment_rationale 
             FROM rns_announcements ra
@@ -51,86 +59,80 @@ def generate_7day_report(ticker):
             AND ra.timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
             ORDER BY ra.timestamp DESC
         """
-        
-        # Ensure the parameter is passed as a tuple (ticker,)
-        df = pd.read_sql(query, conn, params=(ticker,))
-        conn.close()
-        
-        # --- LIVE FALLBACK: Optimized for Yahoo's nested structure ---
+        df = pd.read_sql(query, conn, params=(clean_ticker,))
+
+        # 3. IF EMPTY, FIND THE LATEST NEWS EVER (For the 'Quiet Period' stats)
+        last_news = None
         if df.empty:
-            print(f"🔎 No DB data for {ticker}. Fetching live news fallback...")
-            stock = yf.Ticker(f"{ticker}.L")
-            news_list = stock.news
-            
-            if news_list:
-                live_news = []
-                for item in news_list:
-                    # 1. Correctly extract the headline (Nested in Yahoo's 'content')
-                    content = item.get('content', {})
-                    headline = content.get('title') or item.get('title') or "Market Update"
-                    
-                    # 2. Correctly handle the timestamp
-                    # Yahoo usually provides 'providerPublishTime' as a Unix timestamp
-                    pub_time = item.get('providerPublishTime')
-                    if pub_time:
-                        dt_object = datetime.fromtimestamp(pub_time)
-                    else:
-                        dt_object = datetime.now()
+            cursor.execute("""
+                SELECT ra.timestamp, ra.headline 
+                FROM rns_announcements ra
+                INNER JOIN companies c ON ra.company_id = c.company_id
+                WHERE c.ticker = %s 
+                ORDER BY ra.timestamp DESC LIMIT 1
+            """, (clean_ticker,))
+            last_news = cursor.fetchone()
+        
+        cursor.close()
+        conn.close()
 
-                    # 3. Only include news from the last 7 days
-                    if dt_object >= (datetime.now() - timedelta(days=7)):
-                        live_news.append({
-                            'timestamp': dt_object,
-                            'headline': headline,
-                            'sentiment_score': 0.0 # Placeholder (Real-time scoring is slow for PDFs)
-                        })
-                
-                if live_news:
-                    df = pd.DataFrame(live_news)
-        # --- END FALLBACK ---
-
+        # --- PDF CONSTRUCTION ---
         pdf = FPDF()
         pdf.add_page()
         
-        # 1. ADD BRAND LOGO (Top Left)
         if LOGO_FILE_PATH and os.path.exists(LOGO_FILE_PATH):
-            pdf.image(LOGO_FILE_PATH, 10, 8, 20) # Logo is 20mm wide
+            pdf.image(LOGO_FILE_PATH, 10, 8, 20)
         
-        # 2. HEADER (Nudged right to avoid overlap)
-        pdf.set_font("Arial", 'B', 18)
+        pdf.set_font("Arial", 'B', 16)
         pdf.set_text_color(30, 41, 59) 
-        pdf.set_x(35) # Start text after the logo
-        pdf.cell(0, 10, f"AIM Terminal: {ticker}.L Report", ln=True, align='L')
+        pdf.set_x(35)
+        pdf.cell(0, 10, f"AIM Terminal: {full_name} Report", ln=True, align='L')
         
-        # Sub-info line (Also nudged right)
         pdf.set_x(35)
         pdf.set_font("Arial", '', 10)
         pdf.set_text_color(100, 116, 139)
-        pdf.cell(0, 10, f"Period: Last 7 Days | Generated: {datetime.now().strftime('%d %b %Y')}", ln=True, align='L')
+        pdf.cell(0, 10, f"Period: Last 7 Days | Generated: {datetime.now().strftime('%d %b %Y %Y')}", ln=True, align='L')
         pdf.ln(10)
         
-        # 3. BLUE SEPARATOR LINE (Full width)
         pdf.set_draw_color(59, 130, 246)
         pdf.line(10, 35, 200, 35)
         pdf.ln(5)
 
+        # --- BRANCH A: QUIET PERIOD (No news in 7 days) ---
         if df.empty:
-            pdf.set_font("Arial", 'I', 12)
-            pdf.cell(0, 10, "No RNS announcements found in the last 7 days.", ln=True)
+            pdf.ln(10)
+            pdf.set_font("Arial", 'B', 12)
+            pdf.set_text_color(71, 85, 105)
+            pdf.cell(0, 10, "QUIET PERIOD DETECTED", ln=True)
+            
+            pdf.set_font("Arial", '', 11)
+            pdf.set_text_color(100, 116, 139)
+            pdf.multi_cell(0, 7, f"There have been no official RNS announcements detected for {full_name} in the last 7 days.")
+            
+            if last_news:
+                # Calculate days ago safely
+                delta = datetime.now() - last_news['timestamp']
+                days_ago = delta.days
+                pdf.ln(5)
+                pdf.set_font("Arial", 'I', 10)
+                pdf.multi_cell(0, 7, f"Last Recorded Activity: {last_news['timestamp'].strftime('%d %b %Y')} ({days_ago} days ago)")
+                pdf.set_font("Arial", 'B', 10)
+                # Clean the headline text
+                h_text = str(last_news['headline']).replace('\u2019', "'").replace('\u2018', "'").encode('latin-1', 'replace').decode('latin-1')
+                pdf.multi_cell(0, 7, f"Headline: {h_text}")
+
+        # --- BRANCH B: ACTIVE PERIOD (News Found) ---
         else:
             for _, row in df.iterrows():
-                # --- CLEAN THE HEADLINE ---
-                headline = row['headline']
-                headline = headline.replace('\u2019', "'").replace('\u2018', "'").replace('\u2014', "-")
+                # Clean Headline
+                headline = str(row['headline']).replace('\u2019', "'").replace('\u2018', "'").replace('\u2014', "-")
                 headline = headline.encode('latin-1', 'replace').decode('latin-1')
-                headline = headline.replace('?', "'")
                 
-                # Headline [BOLD]
                 pdf.set_font("Arial", 'B', 11)
                 pdf.set_text_color(30, 41, 59)
                 pdf.multi_cell(0, 7, f"[{row['timestamp'].strftime('%d %b')}] {headline}")
                 
-                # Sentiment Score [COLORED BOLD]
+                # Sentiment Score
                 pdf.set_font("Arial", 'B', 10)
                 score = row['sentiment_score']
                 if score > 0.3:
@@ -142,23 +144,17 @@ def generate_7day_report(ticker):
                 else:
                     pdf.set_text_color(245, 158, 11) # Amber
                     status = "NEUTRAL"
-                    
                 pdf.cell(0, 7, f"AI SENTIMENT SCORE: {score} ({status})", ln=True)
                 
-                # --- NEW: DETAIL SECTION [REGULAR TEXT] ---
+                # Detail / Rationale
                 pdf.set_font("Arial", '', 9)
-                pdf.set_text_color(100, 116, 139) # Slate Grey
-                
-                # Fetch and clean the rationale text
+                pdf.set_text_color(100, 116, 139)
                 detail = str(row.get('sentiment_rationale') or "Analysis details pending next data sync.")
                 detail = detail.replace('\u2019', "'").replace('\u2018', "'").replace('\u2014', "-")
                 detail = detail.encode('latin-1', 'replace').decode('latin-1')
-                detail = detail.replace('?', "'")
-                
                 pdf.multi_cell(0, 5, f"Detail: {detail}")
-                pdf.ln(2) # Small space after detail
                 
-                # Subtle grey divider
+                pdf.ln(2)
                 pdf.set_draw_color(226, 232, 240)
                 pdf.line(10, pdf.get_y(), 200, pdf.get_y())
                 pdf.ln(4)
